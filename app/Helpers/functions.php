@@ -174,36 +174,59 @@ if (!function_exists('cv_is_assigned_admin')) {
 
 if (!function_exists('cv_get_config')) {
     /**
-     * Read module configuration from tbladdonmodules, decrypting password fields.
+     * Read module configuration from mod_cv_settings and tbladdonmodules.
      */
     function cv_get_config(): array
     {
-        $rows = Capsule::table('tbladdonmodules')
-            ->where('module', 'clientverification')
-            ->get();
-
         $config = [];
         $passwordFields = ['didit_api_key', 'didit_webhook_secret', 'encryption_key', 'webhook_outbound_secret', 'api_token'];
 
-        foreach ($rows as $row) {
-            $val = $row->value;
-            if (in_array($row->setting, $passwordFields, true)) {
-                // WHMCS stores module password settings encrypted.
-                if (function_exists('decrypt')) {
-                    $dec = decrypt($val);
-                    $val = ($dec !== false && $dec !== '') ? $dec : $val;
+        // 1. Primary source: mod_cv_settings
+        try {
+            $settings = Capsule::table('mod_cv_settings')->get();
+            foreach ($settings as $s) {
+                $val = $s->setting_value;
+                $config[$s->setting_key] = $val;
+            }
+        } catch (\Exception $e) {}
+
+        // 2. Fallback / legacy merge from tbladdonmodules
+        try {
+            $rows = Capsule::table('tbladdonmodules')
+                ->where('module', 'clientverification')
+                ->get();
+            foreach ($rows as $row) {
+                if (!isset($config[$row->setting]) || $config[$row->setting] === '') {
+                    $val = $row->value;
+                    if (in_array($row->setting, $passwordFields, true) && function_exists('decrypt')) {
+                        $dec = decrypt($val);
+                        $val = ($dec !== false && $dec !== '') ? $dec : $val;
+                    }
+                    $config[$row->setting] = $val;
                 }
             }
-            $config[$row->setting] = $val;
+        } catch (\Exception $e) {}
+
+        // 3. Normalize Didit configuration aliases so core engine always has both
+        if (!empty($config['didit_api_key'])) {
+            $config['api_key'] = $config['didit_api_key'];
+        } elseif (!empty($config['api_key'])) {
+            $config['didit_api_key'] = $config['api_key'];
         }
 
-        // Merge with mod_cv_settings for non-module-field settings.
-        $settings = Capsule::table('mod_cv_settings')->get();
-        foreach ($settings as $s) {
-            if (!isset($config[$s->setting_key])) {
-                $config[$s->setting_key] = $s->setting_value;
-            }
+        if (!empty($config['didit_workflow_id'])) {
+            $config['workflow_id'] = $config['didit_workflow_id'];
+        } elseif (!empty($config['workflow_id'])) {
+            $config['didit_workflow_id'] = $config['workflow_id'];
         }
+
+        if (!empty($config['didit_webhook_secret'])) {
+            $config['webhook_secret'] = $config['didit_webhook_secret'];
+        } elseif (!empty($config['webhook_secret'])) {
+            $config['didit_webhook_secret'] = $config['webhook_secret'];
+        }
+
+        $config['callback_url'] = $config['callback_url'] ?? cv_callback_url();
 
         return $config;
     }

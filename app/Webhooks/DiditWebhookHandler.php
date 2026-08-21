@@ -16,10 +16,10 @@ class DiditWebhookHandler
     public static function handle(string $rawBody, array $headers, array $config): array
     {
         $provider = new DiditProvider(
-            $config['api_key'] ?? '',
-            $config['workflow_id'] ?? '',
-            $config['webhook_secret'] ?? '',
-            $config['callback_url'] ?? ''
+            $config['didit_api_key'] ?? ($config['api_key'] ?? ''),
+            $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? ''),
+            $config['didit_webhook_secret'] ?? ($config['webhook_secret'] ?? ''),
+            $config['callback_url'] ?? cv_callback_url()
         );
 
         $sigHeader = self::header($headers, 'Didit-Signature');

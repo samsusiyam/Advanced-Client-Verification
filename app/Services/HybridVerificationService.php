@@ -51,9 +51,13 @@ class HybridVerificationService
         cv_log_audit($verificationId, 'verification_started', 0, 'method=' . $method);
 
         $redirectUrl = '';
-        $useDidit = ($method === 'didit' || $method === 'hybrid');
+        $apiKey = $config['didit_api_key'] ?? ($config['api_key'] ?? '');
+        $workflowId = $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? '');
 
-        if ($useDidit && !empty($config['api_key']) && !empty($config['workflow_id'])) {
+        if ($useDidit && !empty($apiKey) && !empty($workflowId)) {
+            $config['api_key'] = $apiKey;
+            $config['workflow_id'] = $workflowId;
+            $config['webhook_secret'] = $config['didit_webhook_secret'] ?? ($config['webhook_secret'] ?? '');
             $config['callback_url'] = $config['callback_url'] ?? cv_callback_url();
             $provider = ProviderFactory::make('didit', $config);
             $entity = new VerificationEntity($verificationId, $clientId, $method, $clientRef, $personalData);

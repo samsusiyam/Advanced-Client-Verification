@@ -18,9 +18,9 @@ class ProviderFactory
             case 'didit':
             case 'hybrid':
                 return new DiditProvider(
-                    $config['api_key'] ?? '',
-                    $config['workflow_id'] ?? '',
-                    $config['webhook_secret'] ?? '',
+                    $config['didit_api_key'] ?? ($config['api_key'] ?? ''),
+                    $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? ''),
+                    $config['didit_webhook_secret'] ?? ($config['webhook_secret'] ?? ''),
                     $config['callback_url'] ?? '',
                     $config['base_url'] ?? 'https://apikyc.didit.me'
                 );
