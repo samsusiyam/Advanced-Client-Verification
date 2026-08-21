@@ -20,6 +20,37 @@ class VerificationService
 
     public static function getActiveForClient(int $clientId)
     {
+        // 1. Check for suspended (highest compliance enforcement priority)
+        $suspended = Capsule::table('mod_cv_verifications')
+            ->where('client_id', $clientId)
+            ->where('status', 'suspended')
+            ->orderByDesc('id')
+            ->first();
+        if ($suspended) {
+            return $suspended;
+        }
+
+        // 2. Check for active approved
+        $approved = Capsule::table('mod_cv_verifications')
+            ->where('client_id', $clientId)
+            ->where('status', 'approved')
+            ->orderByDesc('id')
+            ->first();
+        if ($approved) {
+            return $approved;
+        }
+
+        // 3. Check for active under_review / info_requested / pending
+        $active = Capsule::table('mod_cv_verifications')
+            ->where('client_id', $clientId)
+            ->whereIn('status', ['under_review', 'info_requested', 'pending', 'in_progress'])
+            ->orderByDesc('id')
+            ->first();
+        if ($active) {
+            return $active;
+        }
+
+        // 4. Default to latest record (e.g. rejected, expired)
         return Capsule::table('mod_cv_verifications')
             ->where('client_id', $clientId)
             ->orderByDesc('id')
@@ -72,6 +103,21 @@ class VerificationService
             Capsule::table('mod_cv_documents')
                 ->where('verification_id', $verificationId)
                 ->update(['status' => $docStatus, 'updated_at' => date('Y-m-d H:i:s')]);
+        }
+
+        // Sync/close other dangling open sessions for the same client if decided
+        if (in_array($status, ['approved', 'rejected', 'suspended'], true) && $prevRow->client_id > 0) {
+            try {
+                Capsule::table('mod_cv_verifications')
+                    ->where('client_id', $prevRow->client_id)
+                    ->where('id', '!=', $verificationId)
+                    ->whereIn('status', ['pending', 'in_progress', 'under_review', 'info_requested'])
+                    ->update([
+                        'status' => $status,
+                        'rejection_reason' => $note ?: null,
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+            } catch (\Throwable $e) {}
         }
 
         if (function_exists('cv_log_audit')) {
