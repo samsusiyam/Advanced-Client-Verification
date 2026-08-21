@@ -190,64 +190,84 @@ function clientverification_clientarea($vars)
     ];
 }
 
-function cv_insert_default_settings()
-{
-    $defaults = [
-        'enabled' => 'yes',
-        'verification_mode' => 'hybrid',
-        'didit_api_key' => '',
-        'didit_workflow_id' => '',
-        'didit_webhook_secret' => '',
-        'didit_auto_approve' => '1',
-        'didit_on_error' => 'manual_review',
-        'storage_path' => '',
-        'storage_encryption' => '0',
-        'encryption_key' => '',
-        'max_file_size' => '10',
-        'allowed_extensions' => 'pdf,jpg,jpeg,png,webp',
-        'verification_expiry_days' => '365',
-        'risk_threshold_approve' => '30',
-        'risk_threshold_review' => '70',
-        'rate_limit_attempts' => '5',
-        'webhook_outbound_secret' => '',
-        'api_token' => '',
-    ];
+if (!function_exists('cv_insert_default_settings')) {
+    function cv_insert_default_settings()
+    {
+        $defaults = [
+            'enabled' => 'yes',
+            'verification_mode' => 'hybrid',
+            'enable_didit' => 'yes',
+            'enable_manual' => 'yes',
+            'didit_api_key' => '',
+            'didit_workflow_id' => '',
+            'didit_webhook_secret' => '',
+            'didit_auto_approve' => '1',
+            'didit_on_error' => 'manual_review',
+            'storage_path' => '',
+            'storage_encryption' => '0',
+            'encryption_key' => '',
+            'max_file_size' => '10',
+            'allowed_extensions' => 'pdf,jpg,jpeg,png,webp',
+            'verification_expiry_days' => '365',
+            'risk_threshold_approve' => '30',
+            'risk_threshold_review' => '70',
+            'rate_limit_attempts' => '5',
+            'webhook_outbound_secret' => '',
+            'api_token' => '',
+            'mail_client_started' => 'yes',
+            'mail_client_approved' => 'yes',
+            'mail_client_rejected' => 'yes',
+            'mail_client_under_review' => 'yes',
+            'mail_client_info_requested' => 'yes',
+            'mail_client_expiring' => 'yes',
+            'mail_client_expired' => 'yes',
+            'mail_admin_new_submission' => 'yes',
+            'mail_admin_didit_completed' => 'no',
+            'mail_admin_high_risk' => 'yes',
+            'mail_admin_info_response' => 'yes',
+            'admin_notification_emails' => '',
+        ];
 
-    foreach ($defaults as $key => $value) {
-        $exists = Capsule::table('mod_cv_settings')->where('setting_key', $key)->exists();
-        if (!$exists) {
-            Capsule::table('mod_cv_settings')->insert([
-                'setting_key' => $key,
-                'setting_value' => $value,
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s'),
-            ]);
-        }
+        try {
+            foreach ($defaults as $key => $value) {
+                $exists = Capsule::table('mod_cv_settings')->where('setting_key', $key)->exists();
+                if (!$exists) {
+                    Capsule::table('mod_cv_settings')->insert([
+                        'setting_key' => $key,
+                        'setting_value' => $value,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {}
     }
 }
 
-function cv_insert_default_document_types()
-{
-    $types = [
-        ['name' => 'national_id', 'label' => 'National ID Card', 'sides' => 2, 'required' => 1],
-        ['name' => 'passport', 'label' => 'Passport', 'sides' => 1, 'required' => 1],
-        ['name' => 'drivers_license', 'label' => "Driver's License", 'sides' => 2, 'required' => 1],
-        ['name' => 'birth_certificate', 'label' => 'Birth Certificate', 'sides' => 1, 'required' => 1],
-    ];
+if (!function_exists('cv_insert_default_document_types')) {
+    function cv_insert_default_document_types()
+    {
+        $types = [
+            ['name' => 'national_id', 'label' => 'National ID Card', 'sides' => 2, 'required' => 1],
+            ['name' => 'passport', 'label' => 'Passport', 'sides' => 1, 'required' => 1],
+            ['name' => 'drivers_license', 'label' => "Driver's License", 'sides' => 2, 'required' => 1],
+            ['name' => 'birth_certificate', 'label' => 'Birth Certificate', 'sides' => 1, 'required' => 1],
+        ];
 
-    try {
-        Capsule::table('mod_cv_document_types')->whereNotIn('name', ['national_id', 'passport', 'drivers_license', 'birth_certificate'])->delete();
+        try {
+            Capsule::table('mod_cv_document_types')->whereNotIn('name', ['national_id', 'passport', 'drivers_license', 'birth_certificate'])->delete();
 
-        foreach ($types as $type) {
-            Capsule::table('mod_cv_document_types')->updateOrInsert(
-                ['name' => $type['name']],
-                [
-                    'label' => $type['label'],
-                    'sides_required' => $type['sides'],
-                    'is_required' => $type['required'],
-                    'created_at' => date('Y-m-d H:i:s'),
-                ]
-            );
-        }
-    } catch (\Throwable $e) {}
+            foreach ($types as $type) {
+                Capsule::table('mod_cv_document_types')->updateOrInsert(
+                    ['name' => $type['name']],
+                    [
+                        'label' => $type['label'],
+                        'sides_required' => $type['sides'],
+                        'is_required' => $type['required'],
+                        'created_at' => date('Y-m-d H:i:s'),
+                    ]
+                );
+            }
+        } catch (\Throwable $e) {}
+    }
 }
