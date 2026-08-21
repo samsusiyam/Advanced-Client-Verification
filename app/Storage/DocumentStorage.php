@@ -12,9 +12,12 @@ class DocumentStorage
     private bool $encrypt;
     private string $key;
 
-    public function __construct(string $basePath, bool $encrypt = false, string $key = '')
+    public function __construct(string $basePath = '', bool $encrypt = false, string $key = '')
     {
-        $this->basePath = rtrim($basePath, '/');
+        if (empty($basePath)) {
+            $basePath = __DIR__ . '/../../storage';
+        }
+        $this->basePath = rtrim(str_replace('\\', '/', $basePath), '/');
         $this->encrypt = $encrypt;
         $this->key = $key;
     }
@@ -82,12 +85,17 @@ class DocumentStorage
      */
     public function read(string $storagePath, bool $isEncrypted): ?string
     {
-        $realBase = realpath($this->basePath);
-        $realPath = realpath($storagePath);
-        if ($realPath === false || $realBase === false || strpos($realPath, $realBase . DIRECTORY_SEPARATOR) !== 0) {
+        if (!file_exists($storagePath)) {
             return null;
         }
-        if (!file_exists($storagePath)) {
+        $realBase = realpath($this->basePath);
+        $realPath = realpath($storagePath);
+        if ($realPath === false || $realBase === false) {
+            return null;
+        }
+        $normBase = rtrim(str_replace('\\', '/', strtolower($realBase)), '/') . '/';
+        $normPath = str_replace('\\', '/', strtolower($realPath));
+        if (strpos($normPath, $normBase) !== 0) {
             return null;
         }
         $content = file_get_contents($storagePath);

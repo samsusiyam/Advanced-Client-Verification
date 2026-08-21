@@ -44,13 +44,16 @@ function api_response($code, $data)
 }
 
 // Extract bearer token.
-$authHeader = '';
-foreach (getallheaders() ?: [] as $k => $v) {
-    if (strtolower($k) === 'authorization') {
-        $authHeader = $v;
+$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+if (!$authHeader && function_exists('getallheaders')) {
+    foreach (getallheaders() ?: [] as $k => $v) {
+        if (strtolower((string) $k) === 'authorization') {
+            $authHeader = $v;
+            break;
+        }
     }
 }
-if (preg_match('/Bearer\s+(.+)/i', $authHeader, $m)) {
+if (preg_match('/Bearer\s+(.+)/i', (string) $authHeader, $m)) {
     $bearer = trim($m[1]);
 } else {
     $bearer = '';

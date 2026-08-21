@@ -96,6 +96,26 @@ add_hook('ClientAreaPageCart', 1, 'clientverification_cart_notice');
 add_hook('DailyCronJob', 1, 'clientverification_daily_cron');
 
 /**
+ * Add Identity Verification menu item to the Client Area primary navbar.
+ */
+add_hook('ClientAreaPrimaryNavbar', 1, function ($primaryNavbar) {
+    if (cv_setting('enabled', 'yes') !== 'yes') {
+        return;
+    }
+    $clientId = (int) ($_SESSION['uid'] ?? 0);
+    if (!$clientId) {
+        return;
+    }
+    if (!is_null($primaryNavbar->getChild('Account'))) {
+        $primaryNavbar->getChild('Account')->addChild('ClientVerification', [
+            'label' => 'Identity Verification',
+            'uri' => 'index.php?m=clientverification',
+            'order' => 50,
+        ]);
+    }
+});
+
+/**
  * Run scheduled verification tasks via WHMCS cron.
  */
 function clientverification_daily_cron($vars)

@@ -38,6 +38,12 @@ class VerificationService
             $data['reviewed_at'] = date('Y-m-d H:i:s');
             $data['reviewed_by'] = $adminId ? (string) $adminId : null;
         }
+        if ($status === 'approved') {
+            $expiryDays = (int) cv_setting('verification_expiry_days', 365);
+            if ($expiryDays > 0) {
+                $data['expires_at'] = date('Y-m-d H:i:s', time() + ($expiryDays * 86400));
+            }
+        }
         Capsule::table('mod_cv_verifications')->where('id', $verificationId)->update($data);
 
         // Keep associated documents in sync with the verification decision.

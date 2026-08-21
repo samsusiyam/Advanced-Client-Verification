@@ -26,6 +26,7 @@ if (isset($_GET['download']) && is_numeric($_GET['download'])) {
                 header('Content-Type: ' . Sanitizer::headerValue($doc->mime_type));
                 header('Content-Disposition: inline; filename="' . Sanitizer::headerValue($doc->original_filename) . '"');
                 header('X-Content-Type-Options: nosniff');
+                header('Content-Length: ' . strlen($content));
                 echo $content;
                 exit;
             }
@@ -63,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     );
     $retentionDays = (int) ($config['document_retention_days'] ?? 365);
 
-    $types = Capsule::table('mod_cv_document_types')->where('is_required', 1)->get();
+    $types = Capsule::table('mod_cv_document_types')->get();
     $allowedTypes = [];
     foreach ($types as $t) {
         $allowedTypes[$t->name] = $t;

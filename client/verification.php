@@ -23,6 +23,9 @@ $statusBadge = match($v->status) {
 
 $docs = Capsule::table('mod_cv_documents')->where('verification_id', $id)->get();
 $types = Capsule::table('mod_cv_document_types')->where('is_required', 1)->get();
+if ($types->isEmpty()) {
+    $types = Capsule::table('mod_cv_document_types')->get();
+}
 ?>
 
 <div style="max-width: 720px; margin: 30px auto; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">

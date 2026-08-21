@@ -12,7 +12,7 @@ $mode = $config['verification_mode'] ?? 'hybrid';
 $max = (int) ($config['rate_limit_attempts'] ?? 5);
 $ip = RateLimiter::getClientIp();
 if (!RateLimiter::attempt('verification_start', 'client_' . $clientId, $max, 3600)
-    && !RateLimiter::attempt('verification_start', 'ip_' . $ip, $max, 3600)) {
+    || !RateLimiter::attempt('verification_start', 'ip_' . $ip, $max, 3600)) {
     echo '<div class="alert alert-danger">Too many verification attempts. Please try again later.</div>';
     return;
 }

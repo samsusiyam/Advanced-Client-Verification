@@ -88,23 +88,31 @@ if (!function_exists('cv_encrypt_credentials')) {
 if (!function_exists('cv_decrypt_credentials')) {
     function cv_decrypt_credentials(string $cipher)
     {
+        if ($cipher === '') {
+            return '';
+        }
         if (strpos($cipher, 'cv1:') === 0) {
             $parts = explode(':', substr($cipher, 4), 2);
             if (count($parts) === 2) {
                 $iv = base64_decode($parts[0]);
                 $key = cv_derive_encryption_key();
                 $p = openssl_decrypt($parts[1], 'AES-256-CBC', $key, 0, $iv);
-                return $p;
+                if ($p !== false && $p !== null) {
+                    return $p;
+                }
             }
         }
         if (function_exists('decrypt')) {
             try {
-                return decrypt($cipher);
+                $dec = decrypt($cipher);
+                if ($dec !== false && $dec !== '') {
+                    return $dec;
+                }
             } catch (\Exception $e) {
-                return '';
+                // fall through
             }
         }
-        return '';
+        return $cipher;
     }
 }
 
@@ -311,6 +319,10 @@ if (!function_exists('cv_kyc_required_for_product')) {
      */
     function cv_kyc_required_for_product(int $clientId, int $productId): bool
     {
+        if (cv_setting('enabled', 'yes') !== 'yes') {
+            return false;
+        }
+
         // Product-level rule.
         $pRule = Capsule::table('mod_cv_product_rules')->where('product_id', $productId)->first();
         if ($pRule) {
