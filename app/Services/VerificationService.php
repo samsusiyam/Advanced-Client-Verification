@@ -87,13 +87,30 @@ class VerificationService
 
     public static function requestInformation(int $verificationId, int $adminId, string $note = ''): void
     {
+        try {
+            if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'info_request_note')) {
+                Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                    $table->text('info_request_note')->nullable();
+                });
+            }
+        } catch (\Throwable $e) {}
+
         Capsule::table('mod_cv_verifications')
             ->where('id', $verificationId)
-            ->update(['status' => 'under_review', 'updated_at' => date('Y-m-d H:i:s')]);
-        cv_log_audit($verificationId, 'request_information', $adminId, $note);
+            ->update([
+                'status' => 'info_requested',
+                'info_request_note' => $note,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+        if (function_exists('cv_log_audit')) {
+            cv_log_audit($verificationId, 'request_information', $adminId, $note ?: 'Additional information requested');
+        }
+
         $row = self::find($verificationId);
         if ($row) {
-            Notifier::infoRequired($row->client_id);
+            Notifier::infoRequired($row->client_id, ['note' => $note, 'reason' => $note]);
+            OutboundWebhook::dispatch('verification.info_requested', $verificationId);
         }
     }
 

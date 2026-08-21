@@ -9,13 +9,22 @@ $config = cv_get_config();
 $mode = $config['verification_mode'] ?? 'hybrid';
 
 $status = $verification ? $verification->status : 'unverified';
+$hasUploadedDocs = false;
+if ($verification) {
+    $hasUploadedDocs = Capsule::table('mod_cv_documents')->where('verification_id', $verification->id)->exists();
+}
+
+// If status was marked under_review but no documents were actually uploaded, treat as pending
+if ($status === 'under_review' && !$hasUploadedDocs) {
+    $status = 'pending';
+}
 
 ?>
 
 <div style="max-width: 680px; margin: 30px auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
     <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); padding: 32px 28px; text-align: center; color: #ffffff;">
         <div style="width: 60px; height: 60px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto;">
-            <i class="fa fa-shield fa-2x" style="color: #ffffff;"></i>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
         </div>
         <h2 style="margin: 0 0 6px 0; font-size: 24px; font-weight: 700; color: #ffffff;">Identity Verification</h2>
         <p style="margin: 0; opacity: 0.9; font-size: 14px;">Secure and seamless identity verification process</p>
@@ -23,8 +32,8 @@ $status = $verification ? $verification->status : 'unverified';
 
     <div style="padding: 32px 28px; text-align: center;">
         <?php if ($status === 'approved'): ?>
-            <div style="width: 72px; height: 72px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; font-size: 32px;">
-                <i class="fa fa-check"></i>
+            <div style="width: 72px; height: 72px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto;">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
             </div>
             <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #166534;">Identity Verified</h3>
             <p style="color: #4b5563; font-size: 14px; margin-bottom: 24px;">Your identity has been verified successfully. You have full access to all services.</p>
@@ -32,14 +41,34 @@ $status = $verification ? $verification->status : 'unverified';
                 <i class="fa fa-lock"></i> Verification Reference: <?php echo htmlspecialchars($verification->client_ref ?: 'CV-' . $verification->id); ?>
             </div>
 
-        <?php elseif ($status === 'under_review'): ?>
-            <div style="width: 72px; height: 72px; background: #fef3c7; color: #d97706; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; font-size: 32px;">
-                <i class="fa fa-clock-o"></i>
+        <?php elseif ($status === 'under_review' && $hasUploadedDocs): ?>
+            <div style="width: 72px; height: 72px; background: #fef3c7; color: #d97706; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto;">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             </div>
             <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #92400e;">Verification Under Review</h3>
             <p style="color: #4b5563; font-size: 14px; margin-bottom: 24px;">Your submitted documents are currently being reviewed by our compliance team. We will notify you once completed.</p>
             <a href="index.php?m=clientverification&action=verification&id=<?php echo (int) $verification->id; ?>" class="btn btn-default" style="font-weight: 600;">
                 <i class="fa fa-eye"></i> View Submission Status
+            </a>
+
+        <?php elseif ($status === 'info_requested' || (!empty($verification->info_request_note) && !in_array($status, ['approved', 'rejected']))): ?>
+            <div style="width: 72px; height: 72px; background: #e0f2fe; color: #0284c7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto;">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            </div>
+            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #0369a1;">Additional Information Required</h3>
+            <p style="color: #4b5563; font-size: 14px; margin-bottom: 20px;">Our compliance team requires additional details or clearer documents to complete your verification.</p>
+
+            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; text-align: left; max-width: 520px; margin-left: auto; margin-right: auto;">
+                <div style="font-size: 12px; font-weight: 700; color: #0369a1; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa fa-info-circle"></i> Instructions from Compliance:
+                </div>
+                <div style="font-size: 13px; color: #0c4a6e; line-height: 1.4;">
+                    <?php echo htmlspecialchars($verification->info_request_note ?: 'Please upload clearer or updated copies of your identity documents.'); ?>
+                </div>
+            </div>
+
+            <a href="index.php?m=clientverification&action=verification&id=<?php echo (int) $verification->id; ?>" class="btn btn-primary btn-lg" style="font-weight: 600; padding: 12px 28px; border-radius: 6px;">
+                <i class="fa fa-upload"></i> Upload Requested Information &raquo;
             </a>
 
         <?php elseif ($status === 'rejected'): 
@@ -64,8 +93,8 @@ $status = $verification ? $verification->status : 'unverified';
             $canDidit = $enableDidit && $hasDidit && in_array($vMode, ['hybrid', 'didit']);
             $canManual = $enableManual && in_array($vMode, ['hybrid', 'manual']);
         ?>
-            <div style="width: 68px; height: 68px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 30px;">
-                <i class="fa fa-times"></i>
+            <div style="width: 68px; height: 68px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto;">
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </div>
             <h3 style="margin: 0 0 6px 0; font-size: 20px; font-weight: 700; color: #991b1b;">Verification Unsuccessful</h3>
             <p style="color: #64748b; font-size: 14px; margin-bottom: 18px;">Your previous identity verification could not be approved.</p>
@@ -204,4 +233,5 @@ $status = $verification ? $verification->status : 'unverified';
         <?php endif; ?>
     </div>
 </div>
+
 

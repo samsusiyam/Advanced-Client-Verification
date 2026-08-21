@@ -17,6 +17,7 @@ $statusBadge = match($v->status) {
     'approved' => '<span class="label label-success" style="font-size: 12px; padding: 4px 10px;">Approved</span>',
     'rejected' => '<span class="label label-danger" style="font-size: 12px; padding: 4px 10px;">Rejected</span>',
     'under_review' => '<span class="label label-warning" style="font-size: 12px; padding: 4px 10px;">Under Review</span>',
+    'info_requested' => '<span class="label label-info" style="font-size: 12px; padding: 4px 10px; background: #0284c7;">Info Requested</span>',
     'expired' => '<span class="label label-default" style="font-size: 12px; padding: 4px 10px;">Expired</span>',
     default => '<span class="label label-info" style="font-size: 12px; padding: 4px 10px;">Pending Documents</span>',
 };
@@ -53,8 +54,9 @@ if ($types->isEmpty()) {
 
         <div style="padding: 24px;">
             <?php if ($v->status === 'approved'): ?>
-                <div class="alert alert-success" style="border-radius: 8px; margin: 0;">
-                    <i class="fa fa-check-circle"></i> Your identity documents have been approved. No further action is required.
+                <div class="alert alert-success" style="border-radius: 8px; margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <span>Your identity documents have been approved. No further action is required.</span>
                 </div>
             <?php elseif ($v->status === 'rejected'): 
                 $rejectionReason = $v->rejection_reason ?? '';
@@ -72,8 +74,8 @@ if ($types->isEmpty()) {
                 }
             ?>
                 <div style="text-align: center; padding: 10px 10px 20px 10px;">
-                    <div style="width: 72px; height: 72px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px auto; font-size: 32px;">
-                        <i class="fa fa-times"></i>
+                    <div style="width: 72px; height: 72px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px auto;">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </div>
                     <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #991b1b;">Verification Unsuccessful</h3>
                     <p style="color: #64748b; font-size: 14px; margin-bottom: 24px;">Your identity verification could not be approved based on the submitted documents.</p>
@@ -91,10 +93,10 @@ if ($types->isEmpty()) {
                         <i class="fa fa-refresh"></i> Start New Verification &raquo;
                     </a>
                 </div>
-            <?php elseif ($v->status === 'under_review'): ?>
+            <?php elseif ($v->status === 'under_review' && $docs->isNotEmpty()): ?>
                 <div style="text-align: center; padding: 10px 10px 20px 10px;">
-                    <div style="width: 72px; height: 72px; background: #fef3c7; color: #d97706; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px auto; font-size: 32px;">
-                        <i class="fa fa-clock-o"></i>
+                    <div style="width: 72px; height: 72px; background: #fef3c7; color: #d97706; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px auto;">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     </div>
                     <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #92400e;">Account Verification Under Review</h3>
                     <p style="color: #64748b; font-size: 14px; margin-bottom: 24px; max-width: 580px; margin-left: auto; margin-right: auto; line-height: 1.5;">
@@ -106,6 +108,19 @@ if ($types->isEmpty()) {
                 $globalMode = $config['verification_mode'] ?? 'hybrid';
                 $canDidit = $enableDidit && in_array($globalMode, ['hybrid', 'didit']);
             ?>
+                <?php if ($v->status === 'info_requested' || (!empty($v->info_request_note) && !in_array($v->status, ['approved', 'rejected']))): ?>
+                    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 10px; padding: 18px 22px; margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            <h4 style="margin: 0; font-size: 17px; font-weight: 700; color: #0369a1;">Additional Information Required</h4>
+                        </div>
+                        <p style="margin: 0 0 10px 0; color: #0c4a6e; font-size: 13px;">Our compliance team requested additional or updated documents:</p>
+                        <div style="background: #ffffff; border: 1px solid #e0f2fe; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #0369a1; font-weight: 600;">
+                            <i class="fa fa-quote-left" style="color: #38bdf8; margin-right: 6px;"></i> <?php echo htmlspecialchars($v->info_request_note ?: 'Please upload updated document images.'); ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <?php if ($canDidit): ?>
                     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #166534;">

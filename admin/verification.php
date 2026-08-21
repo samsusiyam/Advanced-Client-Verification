@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && Csrf::ch
             $feedbackType = 'warning';
             break;
         case 'request_info':
-            VerificationService::updateStatus($id, 'in_progress', $adminId, $note);
+            VerificationService::requestInformation($id, $adminId, $note);
             $feedbackMessage = 'Additional information requested from client.';
             $feedbackType = 'info';
             break;
@@ -158,6 +158,7 @@ $audit = json_decode($row->audit_log ?? '[]', true);
                 'approved' => '<span class="label label-success" style="font-size: 13px; padding: 5px 12px;">Approved</span>',
                 'rejected' => '<span class="label label-danger" style="font-size: 13px; padding: 5px 12px;">Rejected</span>',
                 'under_review' => '<span class="label label-warning" style="font-size: 13px; padding: 5px 12px;">Under Review</span>',
+                'info_requested' => '<span class="label label-info" style="font-size: 13px; padding: 5px 12px; background: #0284c7;">Info Requested</span>',
                 'expired' => '<span class="label label-default" style="font-size: 13px; padding: 5px 12px;">Expired</span>',
                 default => '<span class="label label-info" style="font-size: 13px; padding: 5px 12px;">Pending</span>',
             };
@@ -168,6 +169,12 @@ $audit = json_decode($row->audit_log ?? '[]', true);
                     <td style="color: #64748b; width: 130px; border-top: none;">Current Status:</td>
                     <td style="border-top: none;"><?php echo $statusBadge; ?></td>
                 </tr>
+                <?php if (!empty($row->info_request_note)): ?>
+                    <tr>
+                        <td style="color: #64748b;">Requested Info:</td>
+                        <td><div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 6px 12px; font-size: 12px; color: #0369a1;"><strong>Note to client:</strong> <?php echo htmlspecialchars($row->info_request_note); ?></div></td>
+                    </tr>
+                <?php endif; ?>
                 <tr>
                     <td style="color: #64748b;">Method:</td>
                     <td><strong style="text-transform: capitalize;"><?php echo htmlspecialchars($row->verification_method); ?></strong></td>
