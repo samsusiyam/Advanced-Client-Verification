@@ -56,14 +56,21 @@ $status = $verification ? $verification->status : 'unverified';
                     }
                 } catch (\Throwable $e) {}
             }
+
+            $enableDidit = cv_setting('enable_didit', 'yes') === 'yes';
+            $enableManual = cv_setting('enable_manual', 'yes') === 'yes';
+            $vMode = cv_setting('verification_mode', 'hybrid');
+            $hasDidit = !empty($config['didit_api_key'] ?? ($config['api_key'] ?? '')) && !empty($config['didit_workflow_id'] ?? ($config['workflow_id'] ?? ''));
+            $canDidit = $enableDidit && $hasDidit && in_array($vMode, ['hybrid', 'didit']);
+            $canManual = $enableManual && in_array($vMode, ['hybrid', 'manual']);
         ?>
-            <div style="width: 72px; height: 72px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; font-size: 32px;">
+            <div style="width: 68px; height: 68px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 30px;">
                 <i class="fa fa-times"></i>
             </div>
-            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #991b1b;">Verification Unsuccessful</h3>
-            <p style="color: #4b5563; font-size: 14px; margin-bottom: 20px;">Your previous identity verification could not be approved.</p>
+            <h3 style="margin: 0 0 6px 0; font-size: 20px; font-weight: 700; color: #991b1b;">Verification Unsuccessful</h3>
+            <p style="color: #64748b; font-size: 14px; margin-bottom: 18px;">Your previous identity verification could not be approved.</p>
 
-            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;">
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; text-align: left; max-width: 520px; margin-left: auto; margin-right: auto;">
                 <div style="font-size: 12px; font-weight: 700; color: #991b1b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
                     <i class="fa fa-exclamation-circle"></i> Reason for Rejection:
                 </div>
@@ -72,9 +79,54 @@ $status = $verification ? $verification->status : 'unverified';
                 </div>
             </div>
 
-            <a href="index.php?m=clientverification&action=start" class="btn btn-primary btn-lg" style="font-weight: 600; padding: 12px 28px; border-radius: 6px;">
-                <i class="fa fa-refresh"></i> Start New Verification &raquo;
-            </a>
+            <div style="border-top: 1px solid #e2e8f0; padding-top: 22px; margin-top: 10px;">
+                <h4 style="margin: 0 0 6px 0; font-size: 16px; font-weight: 700; color: #1e293b;">Start New Verification</h4>
+                <p style="color: #64748b; font-size: 13px; margin-bottom: 20px;">Please choose a method below to restart your verification:</p>
+
+                <?php if ($canDidit && $canManual): ?>
+                    <div class="row" style="text-align: left; margin-bottom: 10px;">
+                        <!-- Option 1: Instant Didit AI -->
+                        <div class="col-sm-6" style="margin-bottom: 16px;">
+                            <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px; padding: 18px 16px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease;">
+                                <div>
+                                    <div style="width: 40px; height: 40px; background: #eff6ff; color: #2563eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 10px;">
+                                        <i class="fa fa-bolt"></i>
+                                    </div>
+                                    <h4 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: #1e293b;">Instant Verification</h4>
+                                    <p style="font-size: 12px; color: #64748b; margin-bottom: 14px; line-height: 1.4;">AI biometric check and instant document scanning.</p>
+                                </div>
+                                <a href="index.php?m=clientverification&action=start&method=didit" class="btn btn-primary btn-block" style="font-weight: 600; padding: 8px 14px; border-radius: 6px;">
+                                    <i class="fa fa-flash"></i> Verify with Didit AI &raquo;
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Option 2: Manual Upload -->
+                        <div class="col-sm-6" style="margin-bottom: 16px;">
+                            <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px; padding: 18px 16px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; transition: all 0.2s ease;">
+                                <div>
+                                    <div style="width: 40px; height: 40px; background: #f0fdf4; color: #16a34a; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 10px;">
+                                        <i class="fa fa-cloud-upload"></i>
+                                    </div>
+                                    <h4 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: #1e293b;">Manual Upload</h4>
+                                    <p style="font-size: 12px; color: #64748b; margin-bottom: 14px; line-height: 1.4;">Upload photos of your ID or Passport for review.</p>
+                                </div>
+                                <a href="index.php?m=clientverification&action=start&method=manual" class="btn btn-success btn-block" style="font-weight: 600; padding: 8px 14px; border-radius: 6px; background: #16a34a; border-color: #16a34a;">
+                                    <i class="fa fa-upload"></i> Upload Documents &raquo;
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                <?php elseif ($canDidit): ?>
+                    <a href="index.php?m=clientverification&action=start&method=didit" class="btn btn-primary btn-lg" style="font-weight: 600; padding: 12px 32px; border-radius: 6px;">
+                        <i class="fa fa-flash"></i> Start Instant Verification &raquo;
+                    </a>
+                <?php else: ?>
+                    <a href="index.php?m=clientverification&action=start&method=manual" class="btn btn-success btn-lg" style="font-weight: 600; padding: 12px 32px; border-radius: 6px; background: #16a34a; border-color: #16a34a;">
+                        <i class="fa fa-upload"></i> Upload Documents &raquo;
+                    </a>
+                <?php endif; ?>
+            </div>
 
         <?php else: 
             $enableDidit = cv_setting('enable_didit', 'yes') === 'yes';

@@ -87,7 +87,7 @@ if ($types->isEmpty()) {
                         </div>
                     </div>
 
-                    <a href="index.php?m=clientverification&action=start" class="btn btn-primary btn-lg" style="font-weight: 700; padding: 12px 36px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                    <a href="index.php?m=clientverification" class="btn btn-primary btn-lg" style="font-weight: 700; padding: 12px 36px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
                         <i class="fa fa-refresh"></i> Start New Verification &raquo;
                     </a>
                 </div>
