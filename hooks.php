@@ -15,12 +15,85 @@ if (!defined('WHMCS')) {
 }
 
 /**
+ * Render prominent verification banner in client area.
+ */
+function cv_render_client_banner(string $context = 'general'): string
+{
+    if (cv_setting('enabled', 'yes') !== 'yes') {
+        return '';
+    }
+    $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
+    if (!$clientId) {
+        return '';
+    }
+    if (cv_is_client_verified($clientId)) {
+        return '';
+    }
+    // Do not show inside the module verification page itself
+    if (isset($_GET['m']) && $_GET['m'] === 'clientverification') {
+        return '';
+    }
+
+    $activeVerification = \ClientVerification\Services\VerificationService::getActiveForClient($clientId);
+    $status = $activeVerification ? $activeVerification->status : 'unverified';
+
+    if ($status === 'under_review') {
+        return '<div class="cv-alert-banner" style="margin: 15px 0 25px 0; background: #fefce8; border: 1px solid #fef08a; border-radius: 10px; padding: 20px 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                <div style="display: flex; align-items: flex-start; gap: 14px;">
+                    <div style="color: #ca8a04; font-size: 22px; line-height: 1.2;">
+                        <i class="fa fa-clock-o"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0 0 4px 0; font-size: 17px; font-weight: 700; color: #854d0e;">Account Verification Under Review</h4>
+                        <p style="margin: 0; color: #713f12; font-size: 13px;">Your identity documents have been submitted and are being reviewed by compliance.</p>
+                    </div>
+                </div>
+                <div>
+                    <a href="index.php?m=clientverification" class="btn btn-warning" style="font-weight: 600; font-size: 13px; padding: 8px 18px; border-radius: 6px;">
+                        <i class="fa fa-eye"></i> View Status
+                    </a>
+                </div>
+            </div>
+        </div>';
+    }
+
+    $msg = 'To fully use our services, verify your identity.';
+    if ($context === 'cart') {
+        $msg = 'Identity verification is required before checkout for items in your cart.';
+    }
+
+    return '<div class="cv-alert-banner" style="margin: 15px 0 25px 0; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 20px 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: flex-start; gap: 14px;">
+                <div style="color: #d97706; font-size: 22px; line-height: 1.2;">
+                    <i class="fa fa-exclamation-triangle"></i>
+                </div>
+                <div>
+                    <h4 style="margin: 0 0 4px 0; font-size: 17px; font-weight: 700; color: #c2410c;">Account Verification Required</h4>
+                    <p style="margin: 0; color: #9a3412; font-size: 13px;">' . htmlspecialchars($msg) . '</p>
+                </div>
+            </div>
+            <div>
+                <a href="index.php?m=clientverification" class="btn" style="background: #c2410c; color: #ffffff; font-weight: 600; font-size: 13px; padding: 8px 20px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; border: none; box-shadow: 0 2px 4px rgba(194, 65, 12, 0.2);">
+                    <i class="fa fa-user"></i> Verify Now
+                </a>
+            </div>
+        </div>
+    </div>';
+}
+
+/**
  * Server-side checkout guard. Blocks checkout when any cart product requires
  * KYC and the client is not verified. This is enforced on the server, not JS.
  */
 function clientverification_checkout_guard($vars)
 {
-    $clientId = (int) ($_SESSION['uid'] ?? 0);
+    if (cv_setting('enabled', 'yes') !== 'yes') {
+        return [];
+    }
+
+    $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
     if (!$clientId) {
         return [];
     }
@@ -52,11 +125,9 @@ function clientverification_checkout_guard($vars)
     if ($blocked) {
         $link = 'index.php?m=clientverification';
         $names = implode(', ', array_map([Sanitizer::class, 'escape'], $requiredProductNames));
-        $message = 'Identity verification is required before checkout. '
-            . 'Please complete verification'
-            . (count($requiredProductNames) ? ' for: ' . $names : '')
-            . '. <a href="' . $link . '">Verify Now</a>';
-        return [$message];
+        $msg = 'Identity verification is required before checkout' . (count($requiredProductNames) ? ' for: <strong>' . $names . '</strong>' : '') . '.';
+        $btn = ' <a href="' . $link . '" class="btn btn-warning btn-xs" style="margin-left: 10px; background: #c2410c; border: none; color: #ffffff; font-weight: 700; padding: 4px 12px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;"><i class="fa fa-shield"></i> Verify Now</a>';
+        return [$msg . $btn];
     }
 
     return [];
@@ -67,7 +138,7 @@ function clientverification_checkout_guard($vars)
  */
 function clientverification_cart_notice($vars)
 {
-    $clientId = (int) ($_SESSION['uid'] ?? 0);
+    $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
     if (!$clientId) {
         return $vars;
     }
@@ -91,6 +162,10 @@ function clientverification_cart_notice($vars)
     return $vars;
 }
 
+add_hook('ClientAreaHeaderOutput', 1, function ($vars) {
+    return cv_render_client_banner('general');
+});
+
 add_hook('ShoppingCartValidateCheckout', 1, 'clientverification_checkout_guard');
 add_hook('ClientAreaPageCart', 1, 'clientverification_cart_notice');
 add_hook('DailyCronJob', 1, 'clientverification_daily_cron');
@@ -102,7 +177,7 @@ add_hook('ClientAreaPrimaryNavbar', 1, function ($primaryNavbar) {
     if (cv_setting('enabled', 'yes') !== 'yes') {
         return;
     }
-    $clientId = (int) ($_SESSION['uid'] ?? 0);
+    $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
     if (!$clientId) {
         return;
     }

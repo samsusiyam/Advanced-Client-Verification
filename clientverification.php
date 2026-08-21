@@ -130,34 +130,42 @@ function clientverification_clientarea($vars)
 {
     $action = $_GET['action'] ?? 'index';
 
-    $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
-    if (!$clientId) {
-        header('Location: clientarea.php');
-        exit;
-    }
-
     $langFile = __DIR__ . '/lang/english.php';
     if (file_exists($langFile)) {
         require_once $langFile;
     }
 
+    ob_start();
     switch ($action) {
         case 'index':
-            require_once __DIR__ . '/client/index.php';
+            require __DIR__ . '/client/index.php';
             break;
         case 'verification':
-            require_once __DIR__ . '/client/verification.php';
+            require __DIR__ . '/client/verification.php';
             break;
         case 'start':
-            require_once __DIR__ . '/client/start.php';
+            require __DIR__ . '/client/start.php';
             break;
         case 'document':
-            require_once __DIR__ . '/client/document.php';
+            require __DIR__ . '/client/document.php';
             break;
         default:
-            require_once __DIR__ . '/client/index.php';
+            require __DIR__ . '/client/index.php';
             break;
     }
+    $content = ob_get_clean();
+
+    return [
+        'pagetitle' => 'Identity Verification',
+        'breadcrumb' => [
+            'index.php?m=clientverification' => 'Identity Verification',
+        ],
+        'templatefile' => 'templates/clientarea',
+        'requirelogin' => true,
+        'vars' => [
+            'content' => $content,
+        ],
+    ];
 }
 
 function cv_insert_default_settings()
