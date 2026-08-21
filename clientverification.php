@@ -100,6 +100,14 @@ function clientverification_output($vars)
         }
     } catch (\Throwable $e) {}
 
+    // Ensure email templates & settings exist
+    if (function_exists('cv_create_email_templates')) {
+        cv_create_email_templates();
+    }
+    if (function_exists('cv_insert_default_settings')) {
+        cv_insert_default_settings();
+    }
+
     $langFile = __DIR__ . '/lang/english.php';
     if (file_exists($langFile)) {
         require_once $langFile;

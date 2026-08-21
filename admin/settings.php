@@ -123,8 +123,61 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cv_test_didit'])) {
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cv_test_email'])) {
+    if (!Csrf::check($_POST['cv_token'] ?? null)) {
+        $errorMessage = 'Security token expired or invalid. Please try again.';
+    } else {
+        $activeTab = 'notifications';
+        $testType = $_POST['test_email_type'] ?? 'client';
+        $testClientId = (int) ($_POST['test_client_id'] ?? 0);
+        $testTemplate = trim($_POST['test_template'] ?? 'KYC Verification Started');
+
+        if ($testType === 'client') {
+            if ($testClientId <= 0) {
+                // Try finding first client in tblclients
+                try {
+                    $testClientId = (int) (Capsule::table('tblclients')->orderBy('id', 'asc')->value('id') ?: 0);
+                } catch (\Throwable $e) {}
+            }
+            if ($testClientId <= 0) {
+                $errorMessage = 'No clients found in WHMCS to send a test email to. Please register at least one client.';
+            } else {
+                $res = \ClientVerification\Mail\Notifier::send(
+                    $testTemplate,
+                    $testClientId,
+                    [
+                        'note' => 'This is a test notification note from the admin debugger.',
+                        'reason' => 'Test KYC verification reason.',
+                        'expiry_date' => date('Y-m-d', strtotime('+365 days')),
+                    ],
+                    "Test KYC Notification - {$testTemplate}",
+                    "<p>This is a test email sent from the KYC Verification Debugger to verify WHMCS email delivery.</p>"
+                );
+
+                $logHtml = implode('<br>&bull; ', array_map('htmlspecialchars', $res['log']));
+                if ($res['success']) {
+                    $successMessage = "✅ <strong>Test Client Email Dispatched Successfully!</strong><br><div style='margin-top:10px; font-size:12px; line-height:1.5; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; color:#334155; text-align:left;'><strong>Execution Trace:</strong><br>&bull; {$logHtml}</div>";
+                } else {
+                    $errorMessage = "❌ <strong>Test Client Email Failed.</strong><br><div style='margin-top:10px; font-size:12px; line-height:1.5; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:12px; color:#991b1b; text-align:left;'><strong>Debug Trace:</strong><br>&bull; {$logHtml}</div>";
+                }
+            }
+        } else {
+            // Admin Alert Test
+            $testSubject = 'KYC Diagnostic Test Alert (' . date('H:i:s') . ')';
+            $testMsg = '<p>This is a diagnostic test message to confirm your KYC Admin Notification settings and delivery routing.</p><p><strong>Timestamp:</strong> ' . date('Y-m-d H:i:s') . '</p>';
+            $res = \ClientVerification\Mail\Notifier::notifyAdmin($testSubject, $testMsg);
+            $logHtml = implode('<br>&bull; ', array_map('htmlspecialchars', $res['log']));
+            if ($res['success']) {
+                $successMessage = "✅ <strong>Test Admin Alert Dispatched Successfully!</strong><br><div style='margin-top:10px; font-size:12px; line-height:1.5; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px; color:#334155; text-align:left;'><strong>Execution Trace:</strong><br>&bull; {$logHtml}</div>";
+            } else {
+                $errorMessage = "❌ <strong>Test Admin Alert Delivery Failed.</strong><br><div style='margin-top:10px; font-size:12px; line-height:1.5; background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:12px; color:#991b1b; text-align:left;'><strong>Debug Trace:</strong><br>&bull; {$logHtml}</div>";
+            }
+        }
+    }
+}
+
 $activeTab = $_GET['tab'] ?? ($_POST['active_tab'] ?? 'general');
-if (!in_array($activeTab, ['general', 'didit', 'storage', 'risk'], true)) {
+if (!in_array($activeTab, ['general', 'notifications', 'didit', 'storage', 'risk'], true)) {
     $activeTab = 'general';
 }
 
@@ -645,6 +698,60 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
                 </div>
             </div>
         </div>
+
+        <!-- Email Delivery Diagnostics & Live Testing -->
+        <div class="cv-section" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-top: 10px;">
+            <div class="cv-section-title" style="font-size: 15px;">
+                <i class="fa fa-paper-plane text-primary"></i> Email Delivery Diagnostics &amp; Live Test
+            </div>
+            <div class="cv-section-desc">
+                Test and verify WHMCS email template rendering, SMTP connection, and admin routing directly to diagnose delivery issues.
+            </div>
+
+            <div class="row" style="margin-top: 16px;">
+                <!-- Test Client Email -->
+                <div class="col-md-6" style="margin-bottom: 16px;">
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px;">
+                        <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 10px;">
+                            <i class="fa fa-user text-primary"></i> Send Test Client Notification
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label style="font-size: 12px; font-weight: 600; color: #475569;">Target Client ID:</label>
+                            <input type="number" id="test_client_id_input" class="form-control input-sm" placeholder="Leave empty for 1st client" value="">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 14px;">
+                            <label style="font-size: 12px; font-weight: 600; color: #475569;">Template to Test:</label>
+                            <select id="test_template_select" class="form-control input-sm">
+                                <option value="KYC Verification Started">KYC Verification Started</option>
+                                <option value="KYC Manual Review Required">KYC Manual Review Required</option>
+                                <option value="KYC Verification Approved">KYC Verification Approved</option>
+                                <option value="KYC Verification Rejected">KYC Verification Rejected</option>
+                                <option value="KYC Additional Information Required">KYC Additional Information Required</option>
+                                <option value="KYC Expiring">KYC Expiring</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-default btn-sm" onclick="cvRunTestEmail('client')" style="font-weight: 600;">
+                            <i class="fa fa-paper-plane"></i> Send Test Client Email
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Test Admin Alert -->
+                <div class="col-md-6" style="margin-bottom: 16px;">
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px;">
+                        <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 10px;">
+                            <i class="fa fa-shield text-danger"></i> Send Test Admin Alert
+                        </div>
+                        <p style="font-size: 12px; color: #64748b; margin-bottom: 14px;">
+                            Dispatches a test diagnostic alert to the configured <strong>Admin Recipient Emails</strong> and default WHMCS administrators via system mailer.
+                        </p>
+                        <button type="button" class="btn btn-default btn-sm" onclick="cvRunTestEmail('admin')" style="font-weight: 600;">
+                            <i class="fa fa-bell"></i> Send Test Admin Alert
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 24px; display: flex; justify-content: flex-end; gap: 10px;">
@@ -705,6 +812,30 @@ function cvGenerateKey() {
         input.type = 'text';
     }
 }
+
+function cvRunTestEmail(type) {
+    var form = document.getElementById('cvTestEmailForm');
+    document.getElementById('cvTestEmailType').value = type;
+
+    if (type === 'client') {
+        var cid = document.getElementById('test_client_id_input').value;
+        var tpl = document.getElementById('test_template_select').value;
+        document.getElementById('cvTestClientId').value = cid;
+        document.getElementById('cvTestTemplate').value = tpl;
+    }
+
+    form.submit();
+}
 </script>
+
+<form method="post" id="cvTestEmailForm" style="display: none;">
+    <?php echo Csrf::field(); ?>
+    <input type="hidden" name="cv_test_email" value="1">
+    <input type="hidden" name="active_tab" value="notifications">
+    <input type="hidden" name="test_email_type" id="cvTestEmailType" value="client">
+    <input type="hidden" name="test_client_id" id="cvTestClientId" value="">
+    <input type="hidden" name="test_template" id="cvTestTemplate" value="">
+</form>
+
 
 

@@ -314,24 +314,45 @@ if (!function_exists('cv_get_config')) {
 
 if (!function_exists('cv_create_email_templates')) {
     /**
-     * Ensure the WHMCS native email templates exist (no custom SMTP needed).
+     * Ensure the WHMCS native email templates exist with professional responsive HTML styling.
      */
     function cv_create_email_templates()
     {
         $templates = [
-            'KYC Verification Started' => ['subject' => 'Identity Verification Started', 'body' => 'Hello, your identity verification process has started. We will notify you once it completes.'],
-            'KYC Verification Approved' => ['subject' => 'Identity Verification Approved', 'body' => 'Hello, your identity verification has been approved. Thank you.'],
-            'KYC Verification Rejected' => ['subject' => 'Identity Verification Rejected', 'body' => 'Hello, unfortunately your identity verification was rejected. Please contact support.'],
-            'KYC Manual Review Required' => ['subject' => 'Identity Verification Under Review', 'body' => 'Hello, your identity verification requires manual review and is currently pending.'],
-            'KYC Additional Information Required' => ['subject' => 'Additional Information Required', 'body' => 'Hello, we need additional information to complete your identity verification.'],
-            'KYC Expiring' => ['subject' => 'Identity Verification Expiring', 'body' => 'Hello, your identity verification will expire soon. Please renew if required.'],
-            'KYC Expired' => ['subject' => 'Identity Verification Expired', 'body' => 'Hello, your identity verification has expired.'],
+            'KYC Verification Started' => [
+                'subject' => 'Identity Verification Started - {$company_name}',
+                'body' => '<p>Dear {$client_name},</p><p>Your identity verification process has been initiated for your account with <strong>{$company_name}</strong>.</p><p>Please follow the instructions on your screen or client area to submit the required identification documents.</p><p><a href="{$verification_url}" style="background: #2563eb; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Complete Verification &raquo;</a></p><p>If you did not initiate this request, please contact our support team immediately.</p><p>Regards,<br>{$company_name}</p>'
+            ],
+            'KYC Verification Approved' => [
+                'subject' => 'Identity Verification Approved - {$company_name}',
+                'body' => '<p>Dear {$client_name},</p><p>Great news! Your identity verification has been reviewed and <strong style="color: #16a34a;">Approved</strong>.</p><p>Your account is now fully verified and in good standing with <strong>{$company_name}</strong>.</p><p><a href="{$verification_url}" style="background: #16a34a; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Verification Status &raquo;</a></p><p>Thank you for your cooperation.</p><p>Regards,<br>{$company_name}</p>'
+            ],
+            'KYC Verification Rejected' => [
+                'subject' => 'Identity Verification Update - Action Required',
+                'body' => '<p>Dear {$client_name},</p><p>We regret to inform you that your identity verification submission could not be approved at this time.</p><p><strong>Reason:</strong> {$reason}</p><p>You may log in to your client area and submit a new verification with valid, clear documents.</p><p><a href="{$verification_url}" style="background: #dc2626; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Submit New Verification &raquo;</a></p><p>If you have any questions, please reach out to our support department.</p><p>Regards,<br>{$company_name}</p>'
+            ],
+            'KYC Manual Review Required' => [
+                'subject' => 'Identity Verification Received - Under Compliance Review',
+                'body' => '<p>Dear {$client_name},</p><p>We have successfully received your identity verification submission. Your documents are currently under review by our compliance team.</p><p>We will notify you by email as soon as the review is complete.</p><p><a href="{$verification_url}" style="background: #2563eb; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Check Status &raquo;</a></p><p>Regards,<br>{$company_name}</p>'
+            ],
+            'KYC Additional Information Required' => [
+                'subject' => 'Action Required: Additional Information Needed for Verification',
+                'body' => '<p>Dear {$client_name},</p><p>Our compliance team requires additional information or clearer documents to finalize your identity verification.</p><p><strong>Staff Note:</strong> {$note}</p><p>Please log in and upload the requested documents at your earliest convenience:</p><p><a href="{$verification_url}" style="background: #0284c7; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Upload Requested Information &raquo;</a></p><p>Regards,<br>{$company_name}</p>'
+            ],
+            'KYC Expiring' => [
+                'subject' => 'Reminder: Your Identity Verification Is Expiring Soon',
+                'body' => '<p>Dear {$client_name},</p><p>This is a courtesy reminder that your annual identity verification with <strong>{$company_name}</strong> will expire on <strong>{$expiry_date}</strong>.</p><p>To prevent any disruption to your services, please renew your verification:</p><p><a href="{$verification_url}" style="background: #d97706; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Renew Verification &raquo;</a></p><p>Regards,<br>{$company_name}</p>'
+            ],
+            'KYC Expired' => [
+                'subject' => 'Important: Your Identity Verification Has Expired',
+                'body' => '<p>Dear {$client_name},</p><p>Your identity verification with <strong>{$company_name}</strong> has expired.</p><p>Please submit updated verification documents to maintain active services on your account:</p><p><a href="{$verification_url}" style="background: #dc2626; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Re-verify Identity Now &raquo;</a></p><p>Regards,<br>{$company_name}</p>'
+            ],
         ];
 
         try {
             foreach ($templates as $name => $tpl) {
-                $exists = Capsule::table('tblemailtemplates')->where('name', $name)->exists();
-                if (!$exists) {
+                $row = Capsule::table('tblemailtemplates')->where('name', $name)->first();
+                if (!$row) {
                     Capsule::table('tblemailtemplates')->insert([
                         'type' => 'general',
                         'name' => $name,
@@ -339,10 +360,11 @@ if (!function_exists('cv_create_email_templates')) {
                         'message' => $tpl['body'],
                         'language' => '',
                         'custom' => 1,
+                        'disabled' => 0,
                     ]);
                 }
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             // Silently handle schema variations across custom WHMCS installs
         }
     }
