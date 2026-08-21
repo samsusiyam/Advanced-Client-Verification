@@ -37,26 +37,7 @@ function cv_render_client_banner(string $context = 'general'): string
     $activeVerification = \ClientVerification\Services\VerificationService::getActiveForClient($clientId);
     $status = $activeVerification ? $activeVerification->status : 'unverified';
 
-    if ($status === 'suspended') {
-        $html = '<div id="cv-verification-banner-wrapper" style="width: 100%; max-width: 1140px; margin: 15px auto 10px auto; padding: 0 15px; box-sizing: border-box; clear: both; display: none;">
-            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="color: #dc2626; font-size: 20px; line-height: 1; flex-shrink: 0;">
-                        <i class="fa fa-ban"></i>
-                    </div>
-                    <div>
-                        <strong style="font-size: 15px; color: #991b1b; display: block; margin-bottom: 2px;">Identity Verification Suspended</strong>
-                        <span style="color: #7f1d1d; font-size: 13px;">Your account verification has been suspended by compliance administration.</span>
-                    </div>
-                </div>
-                <div>
-                    <a href="index.php?m=clientverification" class="btn btn-danger btn-sm" style="font-weight: 600; font-size: 13px; padding: 6px 16px; border-radius: 4px;">
-                        <i class="fa fa-eye"></i> View Details
-                    </a>
-                </div>
-            </div>
-        </div>';
-    } elseif ($status === 'under_review') {
+    if ($status === 'under_review') {
         $html = '<div id="cv-verification-banner-wrapper" style="width: 100%; max-width: 1140px; margin: 15px auto 10px auto; padding: 0 15px; box-sizing: border-box; clear: both; display: none;">
             <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 14px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">
                 <div style="display: flex; align-items: center; gap: 12px;">

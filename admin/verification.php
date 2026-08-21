@@ -67,11 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $feedbackMessage = 'Verification marked as under review.';
             $feedbackType = 'info';
             break;
-        case 'suspend':
-            VerificationService::updateStatus($id, 'suspended', $adminId, $note);
-            $feedbackMessage = 'Verification suspended.';
-            $feedbackType = 'warning';
-            break;
         case 'delete_doc':
             $docId = (int) ($_POST['doc_id'] ?? 0);
             if ($docId > 0 && VerificationService::deleteDocument($docId, $adminId)) {
@@ -162,7 +157,6 @@ $audit = json_decode($row->audit_log ?? '[]', true);
             $statusBadge = match($row->status) {
                 'approved' => '<span class="label label-success" style="font-size: 13px; padding: 5px 12px;">Approved</span>',
                 'rejected' => '<span class="label label-danger" style="font-size: 13px; padding: 5px 12px;">Rejected</span>',
-                'suspended' => '<span class="label label-danger" style="font-size: 13px; padding: 5px 12px; background: #991b1b;"><i class="fa fa-ban"></i> Suspended</span>',
                 'under_review' => '<span class="label label-warning" style="font-size: 13px; padding: 5px 12px;">Under Review</span>',
                 'info_requested' => '<span class="label label-info" style="font-size: 13px; padding: 5px 12px; background: #0284c7;">Info Requested</span>',
                 'expired' => '<span class="label label-default" style="font-size: 13px; padding: 5px 12px;">Expired</span>',
@@ -346,9 +340,6 @@ $audit = json_decode($row->audit_log ?? '[]', true);
                     </button>
                     <button type="submit" name="action" value="manual_review" class="btn btn-info">
                         <i class="fa fa-eye"></i> Under Review
-                    </button>
-                    <button type="submit" name="action" value="suspend" class="btn btn-default" onclick="return confirm('Suspend verification?');">
-                        <i class="fa fa-ban"></i> Suspend
                     </button>
                 </div>
             </form>

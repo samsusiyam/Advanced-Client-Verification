@@ -304,14 +304,6 @@ class Notifier
         return $res['success'];
     }
 
-    public static function suspended(int $clientId, array $vars = []): bool
-    {
-        $sub = 'Important Notice: Identity Verification Suspended';
-        $body = '<p>Dear {$client_name},</p><p>We regret to inform you that your identity verification has been suspended by our compliance administration.</p>' . (!empty($vars['reason']) ? '<p><strong>Reason:</strong> {$reason}</p>' : '') . '<p>If you believe this is in error or require further assistance, please submit a support ticket.</p><p>Regards,<br>{$company_name}</p>';
-        $res = self::send('KYC Verification Rejected', $clientId, $vars, $sub, $body);
-        return $res['success'];
-    }
-
     /* =========================================================================
      * ADMIN NOTIFICATIONS & ROUTING
      * ========================================================================= */

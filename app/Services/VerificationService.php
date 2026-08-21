@@ -20,17 +20,7 @@ class VerificationService
 
     public static function getActiveForClient(int $clientId)
     {
-        // 1. Check for suspended (highest compliance enforcement priority)
-        $suspended = Capsule::table('mod_cv_verifications')
-            ->where('client_id', $clientId)
-            ->where('status', 'suspended')
-            ->orderByDesc('id')
-            ->first();
-        if ($suspended) {
-            return $suspended;
-        }
-
-        // 2. Check for active approved
+        // 1. Check for active approved
         $approved = Capsule::table('mod_cv_verifications')
             ->where('client_id', $clientId)
             ->where('status', 'approved')
@@ -40,7 +30,7 @@ class VerificationService
             return $approved;
         }
 
-        // 3. Check for active under_review / info_requested / pending
+        // 2. Check for active under_review / info_requested / pending
         $active = Capsule::table('mod_cv_verifications')
             ->where('client_id', $clientId)
             ->whereIn('status', ['under_review', 'info_requested', 'pending', 'in_progress'])
@@ -50,7 +40,7 @@ class VerificationService
             return $active;
         }
 
-        // 4. Default to latest record (e.g. rejected, expired)
+        // 3. Default to latest record (e.g. rejected, expired)
         return Capsule::table('mod_cv_verifications')
             ->where('client_id', $clientId)
             ->orderByDesc('id')
@@ -75,11 +65,11 @@ class VerificationService
         }
 
         $data = ['status' => $status, 'updated_at' => date('Y-m-d H:i:s')];
-        if (in_array($status, ['approved', 'rejected', 'suspended'], true)) {
+        if (in_array($status, ['approved', 'rejected'], true)) {
             $data['reviewed_at'] = date('Y-m-d H:i:s');
             $data['reviewed_by'] = $adminId ? (string) $adminId : null;
         }
-        if (in_array($status, ['rejected', 'suspended'], true) && !empty($note)) {
+        if ($status === 'rejected' && !empty($note)) {
             try {
                 if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'rejection_reason')) {
                     Capsule::schema()->table('mod_cv_verifications', function ($table) {
@@ -98,15 +88,14 @@ class VerificationService
         Capsule::table('mod_cv_verifications')->where('id', $verificationId)->update($data);
 
         // Keep associated documents in sync with the verification decision.
-        if (in_array($status, ['approved', 'rejected', 'suspended'], true)) {
-            $docStatus = ($status === 'suspended') ? 'rejected' : $status;
+        if (in_array($status, ['approved', 'rejected'], true)) {
             Capsule::table('mod_cv_documents')
                 ->where('verification_id', $verificationId)
-                ->update(['status' => $docStatus, 'updated_at' => date('Y-m-d H:i:s')]);
+                ->update(['status' => $status, 'updated_at' => date('Y-m-d H:i:s')]);
         }
 
         // Sync/close other dangling open sessions for the same client if decided
-        if (in_array($status, ['approved', 'rejected', 'suspended'], true) && $prevRow->client_id > 0) {
+        if (in_array($status, ['approved', 'rejected'], true) && $prevRow->client_id > 0) {
             try {
                 Capsule::table('mod_cv_verifications')
                     ->where('client_id', $prevRow->client_id)
@@ -132,9 +121,6 @@ class VerificationService
             } elseif ($status === 'rejected') {
                 Notifier::rejected($row->client_id, ['reason' => $note, 'note' => $note]);
                 OutboundWebhook::dispatch('verification.rejected', $verificationId);
-            } elseif ($status === 'suspended') {
-                Notifier::suspended($row->client_id, ['reason' => $note ?: 'Account verification suspended by compliance administration.', 'note' => $note]);
-                OutboundWebhook::dispatch('verification.suspended', $verificationId);
             } elseif ($status === 'under_review') {
                 Notifier::reviewRequired($row->client_id);
                 OutboundWebhook::dispatch('verification.review_required', $verificationId);
@@ -172,17 +158,6 @@ class VerificationService
             Notifier::infoRequired($row->client_id, ['note' => $note, 'reason' => $note]);
             OutboundWebhook::dispatch('verification.info_requested', $verificationId);
         }
-    }
-
-    public static function suspend(int $verificationId, int $adminId, string $note = ''): void
-    {
-        Capsule::table('mod_cv_verifications')
-            ->where('id', $verificationId)
-            ->update(['status' => 'rejected', 'updated_at' => date('Y-m-d H:i:s')]);
-        Capsule::table('mod_cv_documents')
-            ->where('verification_id', $verificationId)
-            ->update(['status' => 'rejected', 'updated_at' => date('Y-m-d H:i:s')]);
-        cv_log_audit($verificationId, 'suspended', $adminId, $note);
     }
 
     /**

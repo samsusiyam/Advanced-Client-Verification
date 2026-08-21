@@ -36,8 +36,8 @@ class HybridVerificationService
             ->first();
 
         if ($existing) {
-            // If already approved or suspended, do not allow creating a new verification
-            if (in_array($existing->status, ['approved', 'suspended'], true)) {
+            // If already approved, do not allow creating a new verification
+            if ($existing->status === 'approved') {
                 return [
                     'verification_id' => (int) $existing->id,
                     'redirect_url' => 'index.php?m=clientverification',

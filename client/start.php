@@ -5,15 +5,6 @@ use ClientVerification\Security\Sanitizer;
 use ClientVerification\Services\HybridVerificationService;
 
 $clientId = (int) (($_SESSION['clientsdetails']['userid'] ?? 0) ?: ($_SESSION['uid'] ?? 0));
-$activeV = \ClientVerification\Services\VerificationService::getActiveForClient($clientId);
-if ($activeV && $activeV->status === 'suspended') {
-    if (!headers_sent()) {
-        header('Location: index.php?m=clientverification');
-    }
-    echo '<script>window.location.href = "index.php?m=clientverification";</script>';
-    exit;
-}
-
 $config = cv_get_config();
 $enableDidit = cv_setting('enable_didit', 'yes') === 'yes' && !empty($config['didit_api_key'] ?? '') && !empty($config['didit_workflow_id'] ?? '');
 $enableManual = cv_setting('enable_manual', 'yes') === 'yes';
