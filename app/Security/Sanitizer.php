@@ -35,6 +35,25 @@ class Sanitizer
     }
 
     /**
+     * Sanitize general single-line text (strip tags, control characters, trim).
+     */
+    public static function text($value, int $maxLength = 255): string
+    {
+        $value = strip_tags((string) $value);
+        $value = preg_replace('/[\x00-\x1F\x7F]/u', '', (string) $value);
+        $value = trim($value);
+        return mb_substr($value, 0, $maxLength);
+    }
+
+    /**
+     * Sanitize alphanumeric with underscores and dashes (e.g. document type keys, slugs).
+     */
+    public static function alphanumeric($value): string
+    {
+        return preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $value);
+    }
+
+    /**
      * Sanitize an integer.
      */
     public static function int($value): int

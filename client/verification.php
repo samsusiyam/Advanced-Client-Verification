@@ -213,13 +213,16 @@ if ($types->isEmpty()) {
                         background: #f8fafc;
                         border: 2px dashed #cbd5e1;
                         border-radius: 8px;
-                        padding: 24px 16px;
+                        padding: 20px 14px;
                         text-align: center;
                         cursor: pointer;
                         transition: all 0.2s ease-in-out;
                         position: relative;
                         display: block;
                         width: 100%;
+                        max-width: 100%;
+                        box-sizing: border-box;
+                        overflow: hidden;
                         margin: 0;
                         user-select: none;
                     }
@@ -228,9 +231,9 @@ if ($types->isEmpty()) {
                         background: #eff6ff;
                     }
                     .cv-dz-icon {
-                        font-size: 38px;
+                        font-size: 36px;
                         color: #2563eb;
-                        margin-bottom: 8px;
+                        margin-bottom: 6px;
                         pointer-events: none;
                     }
                     .cv-dz-title {
@@ -250,24 +253,36 @@ if ($types->isEmpty()) {
                         max-width: 100%;
                         border-radius: 6px;
                         border: 1px solid #cbd5e1;
-                        margin-bottom: 10px;
+                        margin-bottom: 8px;
                         display: inline-block;
                         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                        object-fit: contain;
                     }
                     .cv-file-badge {
                         display: inline-flex;
                         align-items: center;
+                        justify-content: center;
                         gap: 6px;
                         background: #e2e8f0;
-                        padding: 5px 14px;
-                        border-radius: 4px;
+                        padding: 6px 12px;
+                        border-radius: 6px;
                         font-size: 12px;
                         color: #1e293b;
                         font-weight: 600;
+                        max-width: 95%;
+                        box-sizing: border-box;
+                    }
+                    .cv-filename-text {
+                        max-width: 160px;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        display: inline-block;
+                        vertical-align: middle;
                     }
                     .cv-btn-change {
-                        margin-top: 10px;
-                        font-size: 13px;
+                        margin-top: 8px;
+                        font-size: 12px;
                         color: #2563eb;
                         font-weight: 600;
                         text-decoration: underline;
@@ -319,7 +334,7 @@ if ($types->isEmpty()) {
                     if (placeholder) placeholder.style.display = 'none';
                     if (preview) {
                         preview.style.display = 'block';
-                        preview.innerHTML = '<div style="padding: 12px; color: #64748b;"><i class="fa fa-spinner fa-spin"></i> Processing preview...</div>';
+                        preview.innerHTML = '<div style="padding: 10px; color: #64748b;"><i class="fa fa-spinner fa-spin"></i> Processing preview...</div>';
                     }
                     if (dropzone) {
                         dropzone.style.borderColor = '#16a34a';
@@ -333,21 +348,33 @@ if ($types->isEmpty()) {
                         reader.onload = function(e) {
                             if (preview) {
                                 preview.innerHTML = '<img src="' + e.target.result + '" class="cv-preview-img"><br>' +
-                                    '<span class="cv-file-badge"><i class="fa fa-check-circle" style="color: #16a34a;"></i> ' + cvEscapeHtml(file.name) + ' (' + sizeMb + ' MB)</span>' +
+                                    '<span class="cv-file-badge">' +
+                                        '<i class="fa fa-check-circle" style="color: #16a34a; flex-shrink: 0;"></i> ' +
+                                        '<span class="cv-filename-text" title="' + cvEscapeHtml(file.name) + '">' + cvEscapeHtml(file.name) + '</span> ' +
+                                        '<span style="color: #64748b; flex-shrink: 0; font-weight: normal;">(' + sizeMb + ' MB)</span>' +
+                                    '</span>' +
                                     '<div class="cv-btn-change"><i class="fa fa-refresh"></i> Click to change file</div>';
                             }
                         };
                         reader.onerror = function() {
                             if (preview) {
-                                preview.innerHTML = '<span class="cv-file-badge"><i class="fa fa-file-image-o"></i> ' + cvEscapeHtml(file.name) + ' (' + sizeMb + ' MB)</span>' +
+                                preview.innerHTML = '<span class="cv-file-badge">' +
+                                        '<i class="fa fa-file-image-o" style="flex-shrink: 0;"></i> ' +
+                                        '<span class="cv-filename-text" title="' + cvEscapeHtml(file.name) + '">' + cvEscapeHtml(file.name) + '</span> ' +
+                                        '<span style="color: #64748b; flex-shrink: 0; font-weight: normal;">(' + sizeMb + ' MB)</span>' +
+                                    '</span>' +
                                     '<div class="cv-btn-change"><i class="fa fa-refresh"></i> Click to change file</div>';
                             }
                         };
                         reader.readAsDataURL(file);
                     } else {
                         if (preview) {
-                            preview.innerHTML = '<div style="font-size: 42px; color: #dc2626; margin-bottom: 8px;"><i class="fa fa-file-pdf-o"></i></div>' +
-                                '<span class="cv-file-badge"><i class="fa fa-check-circle" style="color: #16a34a;"></i> ' + cvEscapeHtml(file.name) + ' (' + sizeMb + ' MB)</span>' +
+                            preview.innerHTML = '<div style="font-size: 38px; color: #dc2626; margin-bottom: 6px;"><i class="fa fa-file-pdf-o"></i></div>' +
+                                '<span class="cv-file-badge">' +
+                                    '<i class="fa fa-check-circle" style="color: #16a34a; flex-shrink: 0;"></i> ' +
+                                    '<span class="cv-filename-text" title="' + cvEscapeHtml(file.name) + '">' + cvEscapeHtml(file.name) + '</span> ' +
+                                    '<span style="color: #64748b; flex-shrink: 0; font-weight: normal;">(' + sizeMb + ' MB)</span>' +
+                                '</span>' +
                                 '<div class="cv-btn-change"><i class="fa fa-refresh"></i> Click to change file</div>';
                         }
                     }
