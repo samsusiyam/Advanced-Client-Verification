@@ -207,23 +207,25 @@ function cv_insert_default_settings()
 function cv_insert_default_document_types()
 {
     $types = [
+        ['name' => 'national_id', 'label' => 'National ID Card', 'sides' => 2, 'required' => 1],
         ['name' => 'passport', 'label' => 'Passport', 'sides' => 1, 'required' => 1],
         ['name' => 'drivers_license', 'label' => "Driver's License", 'sides' => 2, 'required' => 1],
-        ['name' => 'national_id', 'label' => 'National ID Card', 'sides' => 2, 'required' => 1],
-        ['name' => 'selfie', 'label' => 'Selfie Photo', 'sides' => 1, 'required' => 1],
-        ['name' => 'proof_of_address', 'label' => 'Proof of Address', 'sides' => 1, 'required' => 1],
+        ['name' => 'birth_certificate', 'label' => 'Birth Certificate', 'sides' => 1, 'required' => 1],
     ];
 
-    foreach ($types as $type) {
-        $exists = Capsule::table('mod_cv_document_types')->where('name', $type['name'])->exists();
-        if (!$exists) {
-            Capsule::table('mod_cv_document_types')->insert([
-                'name' => $type['name'],
-                'label' => $type['label'],
-                'sides_required' => $type['sides'],
-                'is_required' => $type['required'],
-                'created_at' => date('Y-m-d H:i:s'),
-            ]);
+    try {
+        Capsule::table('mod_cv_document_types')->whereNotIn('name', ['national_id', 'passport', 'drivers_license', 'birth_certificate'])->delete();
+
+        foreach ($types as $type) {
+            Capsule::table('mod_cv_document_types')->updateOrInsert(
+                ['name' => $type['name']],
+                [
+                    'label' => $type['label'],
+                    'sides_required' => $type['sides'],
+                    'is_required' => $type['required'],
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]
+            );
         }
-    }
+    } catch (\Throwable $e) {}
 }

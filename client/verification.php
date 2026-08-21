@@ -22,13 +22,18 @@ $statusBadge = match($v->status) {
 };
 
 $docs = Capsule::table('mod_cv_documents')->where('verification_id', $id)->get();
-$types = Capsule::table('mod_cv_document_types')->get();
+cv_insert_default_document_types();
+$types = Capsule::table('mod_cv_document_types')
+    ->whereIn('name', ['national_id', 'passport', 'drivers_license', 'birth_certificate'])
+    ->orderByRaw("FIELD(name, 'national_id', 'passport', 'drivers_license', 'birth_certificate')")
+    ->get();
+
 if ($types->isEmpty()) {
     $types = collect([
         (object) ['name' => 'national_id', 'label' => 'National ID Card', 'sides_required' => 2],
         (object) ['name' => 'passport', 'label' => 'Passport', 'sides_required' => 1],
         (object) ['name' => 'drivers_license', 'label' => "Driver's License", 'sides_required' => 2],
-        (object) ['name' => 'proof_of_address', 'label' => 'Proof of Address', 'sides_required' => 1],
+        (object) ['name' => 'birth_certificate', 'label' => 'Birth Certificate', 'sides_required' => 1],
     ]);
 }
 ?>
@@ -99,8 +104,8 @@ if ($types->isEmpty()) {
                         <label style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                             <i class="fa fa-picture-o" style="color: #64748b;"></i> Document Front Side <span style="color: #ef4444;">*</span>
                         </label>
-                        <div class="cv-dropzone" id="dropzone_front" onclick="document.getElementById('file_front').click()">
-                            <input type="file" name="doc_front" id="file_front" accept=".jpg,.jpeg,.png,.webp,.pdf" required style="display: none;">
+                        <input type="file" name="doc_front" id="file_front" accept="image/*,.pdf" required style="position: absolute; opacity: 0; width: 1px; height: 1px;">
+                        <div class="cv-dropzone" id="dropzone_front">
                             <div class="cv-dz-placeholder" id="placeholder_front">
                                 <div class="cv-dz-icon"><i class="fa fa-camera"></i></div>
                                 <div class="cv-dz-title">Click to upload front side</div>
@@ -115,8 +120,8 @@ if ($types->isEmpty()) {
                         <label style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                             <i class="fa fa-picture-o" style="color: #64748b;"></i> Document Back Side <span style="color: #ef4444;">*</span>
                         </label>
-                        <div class="cv-dropzone" id="dropzone_back" onclick="document.getElementById('file_back').click()">
-                            <input type="file" name="doc_back" id="file_back" accept=".jpg,.jpeg,.png,.webp,.pdf" style="display: none;">
+                        <input type="file" name="doc_back" id="file_back" accept="image/*,.pdf" style="position: absolute; opacity: 0; width: 1px; height: 1px;">
+                        <div class="cv-dropzone" id="dropzone_back">
                             <div class="cv-dz-placeholder" id="placeholder_back">
                                 <div class="cv-dz-icon"><i class="fa fa-camera"></i></div>
                                 <div class="cv-dz-title">Click to upload back side</div>
@@ -131,8 +136,8 @@ if ($types->isEmpty()) {
                         <label style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                             <i class="fa fa-user" style="color: #64748b;"></i> Selfie Photo <span style="color: #ef4444;">*</span>
                         </label>
-                        <div class="cv-dropzone" id="dropzone_selfie" onclick="document.getElementById('file_selfie').click()">
-                            <input type="file" name="doc_selfie" id="file_selfie" accept=".jpg,.jpeg,.png,.webp,.pdf" required style="display: none;">
+                        <input type="file" name="doc_selfie" id="file_selfie" accept="image/*,.pdf" required style="position: absolute; opacity: 0; width: 1px; height: 1px;">
+                        <div class="cv-dropzone" id="dropzone_selfie">
                             <div class="cv-dz-placeholder" id="placeholder_selfie">
                                 <div class="cv-dz-icon"><i class="fa fa-user-circle"></i></div>
                                 <div class="cv-dz-title">Click to upload your selfie</div>
@@ -166,6 +171,7 @@ if ($types->isEmpty()) {
                         cursor: pointer;
                         transition: all 0.2s ease-in-out;
                         position: relative;
+                        user-select: none;
                     }
                     .cv-dropzone:hover {
                         border-color: #3b82f6;
@@ -192,6 +198,7 @@ if ($types->isEmpty()) {
                         border-radius: 6px;
                         border: 1px solid #e2e8f0;
                         margin-bottom: 8px;
+                        display: inline-block;
                     }
                     .cv-file-badge {
                         display: inline-flex;
@@ -246,10 +253,16 @@ if ($types->isEmpty()) {
                         var placeholder = document.getElementById('placeholder_' + key);
                         var preview = document.getElementById('preview_' + key);
 
+                        if (!fileInput || !dropzone) return;
+
+                        // Clicking anywhere on dropzone opens file dialog
+                        dropzone.addEventListener('click', function(e) {
+                            fileInput.click();
+                        });
+
                         fileInput.addEventListener('change', function(e) {
                             if (fileInput.files && fileInput.files[0]) {
-                                var file = fileInput.files[0];
-                                showPreview(file, placeholder, preview, key);
+                                showPreview(fileInput.files[0], placeholder, preview, key);
                             }
                         });
 
@@ -274,7 +287,7 @@ if ($types->isEmpty()) {
 
                         dropzone.addEventListener('drop', function(e) {
                             var dt = e.dataTransfer;
-                            if (dt.files && dt.files[0]) {
+                            if (dt && dt.files && dt.files[0]) {
                                 fileInput.files = dt.files;
                                 showPreview(dt.files[0], placeholder, preview, key);
                             }
@@ -282,23 +295,29 @@ if ($types->isEmpty()) {
                     }
 
                     function showPreview(file, placeholder, preview, key) {
+                        if (!file) return;
                         placeholder.style.display = 'none';
                         preview.style.display = 'block';
-                        preview.innerHTML = '';
+                        preview.innerHTML = '<div style="padding: 10px; color: #64748b;"><i class="fa fa-spinner fa-spin"></i> Loading preview...</div>';
 
                         var sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-                        
-                        if (file.type.match('image.*')) {
+                        var isImage = (file.type && file.type.indexOf('image') !== -1) || /\.(jpe?g|png|webp|gif|bmp)$/i.test(file.name);
+
+                        if (isImage) {
                             var reader = new FileReader();
                             reader.onload = function(e) {
                                 preview.innerHTML = '<img src="' + e.target.result + '" class="cv-preview-img"><br>' +
-                                    '<span class="cv-file-badge"><i class="fa fa-check-circle text-success"></i> ' + escapeHtml(file.name) + ' (' + sizeMb + ' MB)</span>' +
+                                    '<span class="cv-file-badge"><i class="fa fa-check-circle" style="color: #16a34a;"></i> ' + escapeHtml(file.name) + ' (' + sizeMb + ' MB)</span>' +
+                                    '<div class="cv-btn-change">Click box to change file</div>';
+                            };
+                            reader.onerror = function() {
+                                preview.innerHTML = '<span class="cv-file-badge"><i class="fa fa-file-image-o"></i> ' + escapeHtml(file.name) + ' (' + sizeMb + ' MB)</span>' +
                                     '<div class="cv-btn-change">Click box to change file</div>';
                             };
                             reader.readAsDataURL(file);
                         } else {
                             preview.innerHTML = '<div style="font-size: 38px; color: #dc2626; margin-bottom: 6px;"><i class="fa fa-file-pdf-o"></i></div>' +
-                                '<span class="cv-file-badge"><i class="fa fa-check-circle text-success"></i> ' + escapeHtml(file.name) + ' (' + sizeMb + ' MB)</span>' +
+                                '<span class="cv-file-badge"><i class="fa fa-check-circle" style="color: #16a34a;"></i> ' + escapeHtml(file.name) + ' (' + sizeMb + ' MB)</span>' +
                                 '<div class="cv-btn-change">Click box to change file</div>';
                         }
                     }
