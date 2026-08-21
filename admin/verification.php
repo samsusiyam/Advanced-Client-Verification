@@ -7,7 +7,7 @@ use ClientVerification\Services\VerificationService;
 use ClientVerification\Storage\DocumentStorage;
 
 $adminId = (int) ($_SESSION['adminid'] ?? 0);
-$id = (int) ($_GET['id'] ?? 0);
+$id = (int) ($_GET['id'] ?? ($_POST['id'] ?? 0));
 
 // Secure document download
 if (isset($_GET['download']) && is_numeric($_GET['download'])) {
@@ -39,9 +39,13 @@ if (isset($_GET['download']) && is_numeric($_GET['download'])) {
 $feedbackMessage = '';
 $feedbackType = 'success';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && Csrf::check($_POST['cv_token'] ?? null)) {
-    $action = $_POST['action'];
-    $note = trim($_POST['note'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if (!Csrf::check($_POST['cv_token'] ?? null)) {
+        $feedbackMessage = 'Security token invalid or expired. Please refresh the page and try again.';
+        $feedbackType = 'danger';
+    } else {
+        $action = $_POST['action'];
+        $note = trim($_POST['note'] ?? '');
 
     switch ($action) {
         case 'approve':
@@ -82,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && Csrf::ch
             header('Location: addonmodules.php?module=clientverification&action=verifications&deleted=1');
             echo '<script>window.location.href = "addonmodules.php?module=clientverification&action=verifications&deleted=1";</script>';
             exit;
+    }
     }
 }
 
@@ -170,6 +175,12 @@ $audit = json_decode($row->audit_log ?? '[]', true);
                     <td style="color: #64748b; width: 130px; border-top: none;">Current Status:</td>
                     <td style="border-top: none;"><?php echo $statusBadge; ?></td>
                 </tr>
+                <?php if (!empty($row->rejection_reason)): ?>
+                    <tr>
+                        <td style="color: #64748b;">Decision Note:</td>
+                        <td><div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 6px 12px; font-size: 12px; color: #991b1b;"><strong>Reason:</strong> <?php echo htmlspecialchars($row->rejection_reason); ?></div></td>
+                    </tr>
+                <?php endif; ?>
                 <?php if (!empty($row->info_request_note)): ?>
                     <tr>
                         <td style="color: #64748b;">Requested Info:</td>
