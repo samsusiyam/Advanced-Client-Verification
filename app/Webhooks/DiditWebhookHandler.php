@@ -33,17 +33,19 @@ class DiditWebhookHandler
         $timestampHeader = (int) (self::header($headers, 'x-timestamp')
             ?: self::header($headers, 'http_x_timestamp'));
 
-        if (!$provider->verifyWebhook($rawBody, $sigHeader, $timestampHeader)) {
+        $payload = json_decode($rawBody, true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        if (!$provider->verifyWebhook($rawBody, $sigHeader, $timestampHeader, $payload)) {
             return ['success' => false, 'error' => 'invalid_signature'];
         }
 
-        $payload = json_decode($rawBody, true);
-        if (!is_array($payload)) {
-            return ['success' => false, 'error' => 'invalid_json'];
-        }
-
         $sessionId = $payload['session_id'] ?? '';
-        $eventId = $payload['event_id'] ?? ($payload['id'] ?? $sessionId);
+        $status = $payload['status'] ?? '';
+        $webhookType = $payload['webhook_type'] ?? 'status.updated';
+        $eventId = $payload['event_id'] ?? ($payload['id'] ?? ($sessionId . '_' . $status . '_' . $webhookType));
 
         // Check if this is a Didit test webhook
         $isTest = (
@@ -66,18 +68,9 @@ class DiditWebhookHandler
             return ['success' => true, 'error' => '', 'status' => 'test_webhook_verified'];
         }
 
-        // Idempotency / replay protection. Match both completed (1) and
-        // in-flight (0) events so a concurrent duplicate is rejected before it
-        // can be processed (closes the TOCTOU race window).
+        // Idempotency: match on exact event_id to prevent duplicate processing
         $existing = Capsule::table('mod_cv_webhook_events')
-            ->where(function ($q) use ($eventId, $sessionId) {
-                if ($eventId) {
-                    $q->where('event_id', $eventId);
-                }
-                if ($sessionId) {
-                    $q->orWhere('session_id', $sessionId);
-                }
-            })
+            ->where('event_id', $eventId)
             ->whereIn('processed', [0, 1])
             ->first();
 

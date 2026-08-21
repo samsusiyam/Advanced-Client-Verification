@@ -137,9 +137,11 @@ class DiditProvider implements KycProviderInterface
 
     /**
      * Verify the Didit webhook signature across all Didit header variants.
-     * Supports: X-Signature, X-Signature-V2, X-Signature-Simple, and Didit-Signature
+     * Supports: X-Signature-V2 (canonical JSON), X-Signature (raw bytes),
+     * X-Signature-Simple ({timestamp}:{session_id}:{status}:{webhook_type}),
+     * and Didit-Signature with 5-minute freshness validation.
      */
-    public function verifyWebhook(string $rawBody, $signatureHeader, ?int $timestamp = null): bool
+    public function verifyWebhook(string $rawBody, $signatureHeader, ?int $timestamp = null, array $payload = []): bool
     {
         if (empty($this->webhookSecret) || empty($signatureHeader)) {
             return false;
@@ -148,7 +150,44 @@ class DiditProvider implements KycProviderInterface
         $sig = is_array($signatureHeader) ? ($signatureHeader[0] ?? '') : (string) $signatureHeader;
         $sig = trim($sig);
 
-        // Check if header is in t=...,v1=... format
+        // 1. Validate timestamp freshness (within 300 seconds / 5 minutes)
+        if ($timestamp !== null && $timestamp > 0) {
+            if (abs(time() - $timestamp) > 300) {
+                return false;
+            }
+        }
+
+        // 2. Direct payload HMAC (X-Signature over raw bytes)
+        $expectedDirect = hash_hmac('sha256', $rawBody, $this->webhookSecret);
+        if (hash_equals($expectedDirect, $sig)) {
+            return true;
+        }
+
+        // 3. X-Signature-V2: Canonical JSON sorted keys with Unicode preserved
+        if (!empty($rawBody)) {
+            $data = !empty($payload) ? $payload : json_decode($rawBody, true);
+            if (is_array($data)) {
+                $canonicalJson = self::canonicalizeJson($data);
+                $expectedV2 = hash_hmac('sha256', $canonicalJson, $this->webhookSecret);
+                if (hash_equals($expectedV2, $sig)) {
+                    return true;
+                }
+            }
+        }
+
+        // 4. X-Signature-Simple: "{timestamp}:{session_id}:{status}:{webhook_type}"
+        if (!empty($payload) && $timestamp !== null && $timestamp > 0) {
+            $sessionId = $payload['session_id'] ?? '';
+            $status = $payload['status'] ?? '';
+            $webhookType = $payload['webhook_type'] ?? '';
+            $simpleMsg = "{$timestamp}:{$sessionId}:{$status}:{$webhookType}";
+            $expectedSimple = hash_hmac('sha256', $simpleMsg, $this->webhookSecret);
+            if (hash_equals($expectedSimple, $sig)) {
+                return true;
+            }
+        }
+
+        // 5. Header format t=...,v2=... or t=...,v1=...
         if (strpos($sig, 't=') !== false && strpos($sig, '=') !== false) {
             $parts = [];
             foreach (explode(',', $sig) as $pair) {
@@ -157,49 +196,73 @@ class DiditProvider implements KycProviderInterface
                     $parts[trim($kv[0])] = trim($kv[1]);
                 }
             }
-            if (isset($parts['t'])) {
-                $timestamp = (int) $parts['t'];
-            }
+            $t = isset($parts['t']) ? (int) $parts['t'] : $timestamp;
             $hash = $parts['v2'] ?? ($parts['v1'] ?? '');
             if (!empty($hash)) {
-                $sig = $hash;
-            }
-        }
-
-        // Direct payload HMAC comparison
-        $expectedDirect = hash_hmac('sha256', $rawBody, $this->webhookSecret);
-        if (hash_equals($expectedDirect, $sig)) {
-            return true;
-        }
-
-        // Timestamped payload HMAC comparison: timestamp.rawBody
-        if ($timestamp !== null && $timestamp > 0) {
-            $expectedWithTs = hash_hmac('sha256', $timestamp . '.' . $rawBody, $this->webhookSecret);
-            if (hash_equals($expectedWithTs, $sig)) {
-                return true;
+                if ($t && abs(time() - $t) > 300) {
+                    return false;
+                }
+                $expected = hash_hmac('sha256', $rawBody, $this->webhookSecret);
+                if (hash_equals($expected, $hash)) {
+                    return true;
+                }
+                if ($t) {
+                    $expectedWithT = hash_hmac('sha256', $t . '.' . $rawBody, $this->webhookSecret);
+                    if (hash_equals($expectedWithT, $hash)) {
+                        return true;
+                    }
+                }
             }
         }
 
         return false;
     }
 
+    private static function canonicalizeJson(array $data): string
+    {
+        ksort($data);
+        foreach ($data as $k => $v) {
+            if (is_array($v)) {
+                $data[$k] = (array_keys($v) !== range(0, count($v) - 1)) ? json_decode(self::canonicalizeJson($v), true) : $v;
+            }
+        }
+        return json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
     private function normalize(array $data): KycResult
     {
         $sessionId = $data['session_id'] ?? '';
-        $status = strtolower($data['status'] ?? ($data['decision'] ?? 'pending'));
+        $rawStatus = trim((string)($data['status'] ?? ($data['decision'] ?? 'pending')));
+        $statusLower = strtolower($rawStatus);
 
         $decision = KycResult::DECISION_REVIEW;
-        switch ($status) {
+        switch ($statusLower) {
             case 'approved':
             case 'clear':
             case 'success':
                 $decision = KycResult::DECISION_APPROVED;
                 break;
-            case 'denied':
             case 'declined':
+            case 'denied':
             case 'rejected':
                 $decision = KycResult::DECISION_DECLINED;
                 break;
+            case 'in review':
+            case 'in_review':
+            case 'review':
+                $decision = KycResult::DECISION_REVIEW;
+                break;
+            case 'in progress':
+            case 'in_progress':
+                $decision = KycResult::DECISION_REVIEW;
+                break;
+            case 'resubmitted':
+            case 'not started':
+                $decision = KycResult::DECISION_REVIEW;
+                break;
+            case 'expired':
+            case 'kyc expired':
+            case 'abandoned':
             case 'error':
             case 'failed':
             case 'timeout':
@@ -212,7 +275,7 @@ class DiditProvider implements KycProviderInterface
         $riskScore = (float) ($data['risk_score'] ?? ($data['score'] ?? 0));
         $riskLevel = $this->levelFromScore($riskScore);
 
-        return new KycResult($sessionId, $status, $decision, $riskScore, $riskLevel, $data);
+        return new KycResult($sessionId, $statusLower, $decision, $riskScore, $riskLevel, $data);
     }
 
     private function levelFromScore(float $score): string

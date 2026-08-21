@@ -14,18 +14,34 @@ class Http
     public static function post(string $url, array $payload, array $headers = [], int $timeout = 30): array
     {
         $body = json_encode($payload);
-        $defaultHeaders = [
-            'Content-Type: application/json',
-            'Content-Length: ' . strlen($body),
+        $normalized = [
+            'content-type' => 'Content-Type: application/json',
+            'content-length' => 'Content-Length: ' . strlen($body),
+            'accept' => 'Accept: application/json',
         ];
-        $allHeaders = array_merge($defaultHeaders, $headers);
 
-        return self::request($url, 'POST', $body, $allHeaders, $timeout);
+        foreach ($headers as $h) {
+            $parts = explode(':', $h, 2);
+            $key = strtolower(trim($parts[0]));
+            $normalized[$key] = trim($h);
+        }
+
+        return self::request($url, 'POST', $body, array_values($normalized), $timeout);
     }
 
     public static function get(string $url, array $headers = [], int $timeout = 30): array
     {
-        return self::request($url, 'GET', '', $headers, $timeout);
+        $normalized = [
+            'accept' => 'Accept: application/json',
+        ];
+
+        foreach ($headers as $h) {
+            $parts = explode(':', $h, 2);
+            $key = strtolower(trim($parts[0]));
+            $normalized[$key] = trim($h);
+        }
+
+        return self::request($url, 'GET', '', array_values($normalized), $timeout);
     }
 
     private static function request(string $url, string $method, string $body, array $headers, int $timeout): array
