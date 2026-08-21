@@ -56,9 +56,40 @@ if ($types->isEmpty()) {
                 <div class="alert alert-success" style="border-radius: 8px; margin: 0;">
                     <i class="fa fa-check-circle"></i> Your identity documents have been approved. No further action is required.
                 </div>
-            <?php elseif ($v->status === 'under_review'): ?>
-                <div class="alert alert-info" style="border-radius: 8px; margin-bottom: 20px;">
-                    <i class="fa fa-clock-o"></i> Your documents have been submitted and are currently in the compliance review queue.
+            <?php elseif ($v->status === 'rejected'): 
+                $rejectionReason = $v->rejection_reason ?? '';
+                if (empty($rejectionReason)) {
+                    try {
+                        $lastRejectLog = Capsule::table('mod_cv_audit_logs')
+                            ->where('verification_id', $id)
+                            ->whereIn('action', ['status_rejected', 'rejected', 'admin_rejected'])
+                            ->orderByDesc('id')
+                            ->first();
+                        if ($lastRejectLog && !empty($lastRejectLog->details) && $lastRejectLog->details !== 'admin_rejected') {
+                            $rejectionReason = $lastRejectLog->details;
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            ?>
+                <div style="text-align: center; padding: 10px 10px 20px 10px;">
+                    <div style="width: 72px; height: 72px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px auto; font-size: 32px;">
+                        <i class="fa fa-times"></i>
+                    </div>
+                    <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #991b1b;">Verification Unsuccessful</h3>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 24px;">Your identity verification could not be approved based on the submitted documents.</p>
+
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: left; max-width: 580px; margin-left: auto; margin-right: auto;">
+                        <div style="font-size: 13px; font-weight: 700; color: #991b1b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa fa-exclamation-circle"></i> Reason for Rejection:
+                        </div>
+                        <div style="font-size: 14px; color: #7f1d1d; line-height: 1.5;">
+                            <?php echo htmlspecialchars($rejectionReason ?: 'The submitted documents were unclear, invalid, or did not match your account information. Please submit new, clear documents.'); ?>
+                        </div>
+                    </div>
+
+                    <a href="index.php?m=clientverification&action=start" class="btn btn-primary btn-lg" style="font-weight: 700; padding: 12px 36px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                        <i class="fa fa-refresh"></i> Start New Verification &raquo;
+                    </a>
                 </div>
             <?php else: ?>
                 <!-- Manual Upload Header Card -->
@@ -348,7 +379,7 @@ if ($types->isEmpty()) {
                 </script>
             <?php endif; ?>
 
-            <?php if (!$docs->isEmpty()): ?>
+            <?php if (!$docs->isEmpty() && in_array($v->status, ['under_review', 'approved'])): ?>
                 <div style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
                     <h4 style="margin: 0 0 14px 0; font-size: 15px; font-weight: 700; color: #1e293b;">Uploaded Documents</h4>
                     <div style="display: flex; flex-direction: column; gap: 8px;">

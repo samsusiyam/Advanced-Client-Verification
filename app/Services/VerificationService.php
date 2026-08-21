@@ -38,6 +38,16 @@ class VerificationService
             $data['reviewed_at'] = date('Y-m-d H:i:s');
             $data['reviewed_by'] = $adminId ? (string) $adminId : null;
         }
+        if ($status === 'rejected' && !empty($note)) {
+            try {
+                if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'rejection_reason')) {
+                    Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                        $table->text('rejection_reason')->nullable();
+                    });
+                }
+                $data['rejection_reason'] = $note;
+            } catch (\Throwable $e) {}
+        }
         if ($status === 'approved') {
             $expiryDays = (int) cv_setting('verification_expiry_days', 365);
             if ($expiryDays > 0) {

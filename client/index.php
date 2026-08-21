@@ -42,14 +42,38 @@ $status = $verification ? $verification->status : 'unverified';
                 <i class="fa fa-eye"></i> View Submission Status
             </a>
 
-        <?php elseif ($status === 'rejected'): ?>
+        <?php elseif ($status === 'rejected'): 
+            $rejectionReason = $verification->rejection_reason ?? '';
+            if (empty($rejectionReason)) {
+                try {
+                    $lastRejectLog = Capsule::table('mod_cv_audit_logs')
+                        ->where('verification_id', $verification->id)
+                        ->whereIn('action', ['status_rejected', 'rejected', 'admin_rejected'])
+                        ->orderByDesc('id')
+                        ->first();
+                    if ($lastRejectLog && !empty($lastRejectLog->details) && $lastRejectLog->details !== 'admin_rejected') {
+                        $rejectionReason = $lastRejectLog->details;
+                    }
+                } catch (\Throwable $e) {}
+            }
+        ?>
             <div style="width: 72px; height: 72px; background: #fee2e2; color: #dc2626; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; font-size: 32px;">
                 <i class="fa fa-times"></i>
             </div>
             <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #991b1b;">Verification Unsuccessful</h3>
-            <p style="color: #4b5563; font-size: 14px; margin-bottom: 24px;">Your previous verification could not be approved. Please review your details and submit new documents.</p>
+            <p style="color: #4b5563; font-size: 14px; margin-bottom: 20px;">Your previous identity verification could not be approved.</p>
+
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;">
+                <div style="font-size: 12px; font-weight: 700; color: #991b1b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa fa-exclamation-circle"></i> Reason for Rejection:
+                </div>
+                <div style="font-size: 13px; color: #7f1d1d; line-height: 1.4;">
+                    <?php echo htmlspecialchars($rejectionReason ?: 'The submitted documents were unclear, invalid, or did not meet compliance standards. Please submit new, clear documents.'); ?>
+                </div>
+            </div>
+
             <a href="index.php?m=clientverification&action=start" class="btn btn-primary btn-lg" style="font-weight: 600; padding: 12px 28px; border-radius: 6px;">
-                <i class="fa fa-refresh"></i> Try Again
+                <i class="fa fa-refresh"></i> Start New Verification &raquo;
             </a>
 
         <?php else: 
