@@ -1,0 +1,17 @@
+# Dependencies (installed via composer in a real WHMCS environment)
+/vendor/
+
+# Local environment / secrets
+.env
+*.env
+*.key
+*.pem
+*.crt
+
+# Logs
+*.log
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp

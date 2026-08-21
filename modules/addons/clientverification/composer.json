@@ -1,0 +1,25 @@
+{
+    "name": "clientverification/advanced-client-verification",
+    "description": "Production-ready open-source KYC verification for WHMCS (Manual, Didit, Hybrid).",
+    "type": "whmcs-addon",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Advanced Client Verification Contributors"
+        }
+    ],
+    "require": {
+        "php": ">=8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "ClientVerification\\": "app/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    },
+    "scripts": {
+        "test": "phpunit --configuration phpunit.xml.dist"
+    }
+}
