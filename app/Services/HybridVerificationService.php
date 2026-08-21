@@ -70,7 +70,7 @@ class HybridVerificationService
         }
 
         $redirectUrl = '';
-        $useDidit = ($method === 'didit' || $method === 'hybrid');
+        $useDidit = ($method === 'didit');
         $apiKey = $config['didit_api_key'] ?? ($config['api_key'] ?? '');
         $workflowId = $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? '');
 

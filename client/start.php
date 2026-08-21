@@ -6,22 +6,30 @@ use ClientVerification\Services\HybridVerificationService;
 
 $clientId = (int) (($_SESSION['clientsdetails']['userid'] ?? 0) ?: ($_SESSION['uid'] ?? 0));
 $config = cv_get_config();
-$enableDidit = cv_setting('enable_didit', 'yes') === 'yes';
+$enableDidit = cv_setting('enable_didit', 'yes') === 'yes' && !empty($config['didit_api_key'] ?? '') && !empty($config['didit_workflow_id'] ?? '');
 $enableManual = cv_setting('enable_manual', 'yes') === 'yes';
-$mode = $config['verification_mode'] ?? 'hybrid';
+$globalMode = $config['verification_mode'] ?? 'hybrid';
+
+$canDidit = $enableDidit && in_array($globalMode, ['hybrid', 'didit']);
+$canManual = $enableManual && in_array($globalMode, ['hybrid', 'manual']);
 
 $requestedMethod = $_GET['method'] ?? '';
-if ($requestedMethod === 'manual') {
-    $mode = 'manual';
-} elseif ($requestedMethod === 'didit') {
-    $mode = 'didit';
-}
 
-if ($mode === 'didit' && (!$enableDidit || empty($config['didit_api_key'] ?? ''))) {
-    $mode = $enableManual ? 'manual' : 'didit';
-}
-if ($mode === 'manual' && !$enableManual) {
-    $mode = ($enableDidit && !empty($config['didit_api_key'] ?? '')) ? 'didit' : 'manual';
+if ($requestedMethod === 'manual' && $canManual) {
+    $mode = 'manual';
+} elseif ($requestedMethod === 'didit' && $canDidit) {
+    $mode = 'didit';
+} elseif ($canDidit && $canManual) {
+    // Both are enabled and no method explicitly requested -> Show selection screen
+    if (!headers_sent()) {
+        header('Location: index.php?m=clientverification');
+    }
+    echo '<script>window.location.href = "index.php?m=clientverification";</script>';
+    exit;
+} elseif ($canDidit) {
+    $mode = 'didit';
+} else {
+    $mode = 'manual';
 }
 
 // Rate limit: max attempts from config (default 5/hour).
