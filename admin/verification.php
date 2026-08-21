@@ -207,11 +207,11 @@ $audit = json_decode($row->audit_log ?? '[]', true);
 
             <?php if ($personal): ?>
                 <table class="table table-condensed" style="margin: 0;">
-                    <?php foreach (['first_name' => 'First Name', 'last_name' => 'Last Name', 'date_of_birth' => 'Date of Birth', 'phone' => 'Phone', 'address' => 'Address', 'city' => 'City', 'state' => 'State', 'postal_code' => 'Postal Code', 'country' => 'Country'] as $field => $lbl): ?>
+                    <?php foreach (['document_number' => 'Document / ID Number', 'first_name' => 'First Name', 'last_name' => 'Last Name', 'date_of_birth' => 'Date of Birth', 'phone' => 'Phone', 'address' => 'Address', 'city' => 'City', 'state' => 'State', 'postal_code' => 'Postal Code', 'country' => 'Country'] as $field => $lbl): ?>
                         <?php if (!empty($personal->$field)): ?>
                             <tr>
-                                <td style="color: #64748b; width: 120px;"><?php echo $lbl; ?>:</td>
-                                <td style="font-weight: 500;"><?php echo htmlspecialchars($personal->$field); ?></td>
+                                <td style="color: #64748b; width: 140px;"><?php echo $lbl; ?>:</td>
+                                <td style="font-weight: 600; color: #1e293b;"><?php echo htmlspecialchars($personal->$field); ?></td>
                             </tr>
                         <?php endif; ?>
                     <?php endforeach; ?>

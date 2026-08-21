@@ -6,7 +6,13 @@ use ClientVerification\Services\HybridVerificationService;
 
 $clientId = (int) (($_SESSION['clientsdetails']['userid'] ?? 0) ?: ($_SESSION['uid'] ?? 0));
 $config = cv_get_config();
+$requestedMethod = $_GET['method'] ?? '';
 $mode = $config['verification_mode'] ?? 'hybrid';
+if ($requestedMethod === 'manual') {
+    $mode = 'manual';
+} elseif ($requestedMethod === 'didit') {
+    $mode = 'didit';
+}
 
 // Rate limit: max attempts from config (default 5/hour).
 $max = (int) ($config['rate_limit_attempts'] ?? 5);

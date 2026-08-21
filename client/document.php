@@ -69,35 +69,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     foreach ($types as $t) {
         $allowedTypes[$t->name] = $t;
     }
-    $anyUploaded = false;
+    $docType = Sanitizer::alphanumeric($_POST['document_type'] ?? 'national_id');
+    $docNumber = Sanitizer::text($_POST['document_number'] ?? '');
 
+    // Save document number in personal data or audit log
+    if (!empty($docNumber)) {
+        try {
+            $hasPersonal = Capsule::table('mod_cv_personal_data')->where('verification_id', $verificationId)->exists();
+            if ($hasPersonal) {
+                // If column doesn't exist, ignore exception
+                if (Capsule::schema()->hasColumn('mod_cv_personal_data', 'document_number')) {
+                    Capsule::table('mod_cv_personal_data')->where('verification_id', $verificationId)->update([
+                        'document_number' => $docNumber,
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {}
+        cv_log_audit($verificationId, 'document_number_saved', 0, 'number=' . substr($docNumber, 0, 4) . '****');
+    }
+
+    $uploadQueue = [];
+
+    // 1. Process new form format (doc_front, doc_back, doc_selfie)
+    if (isset($_FILES['doc_front']) && is_array($_FILES['doc_front']) && ($_FILES['doc_front']['error'] ?? null) === UPLOAD_ERR_OK) {
+        $uploadQueue[] = ['file' => $_FILES['doc_front'], 'type' => $docType, 'side' => 'front'];
+    }
+    if (isset($_FILES['doc_back']) && is_array($_FILES['doc_back']) && ($_FILES['doc_back']['error'] ?? null) === UPLOAD_ERR_OK) {
+        $uploadQueue[] = ['file' => $_FILES['doc_back'], 'type' => $docType, 'side' => 'back'];
+    }
+    if (isset($_FILES['doc_selfie']) && is_array($_FILES['doc_selfie']) && ($_FILES['doc_selfie']['error'] ?? null) === UPLOAD_ERR_OK) {
+        $uploadQueue[] = ['file' => $_FILES['doc_selfie'], 'type' => 'selfie', 'side' => 'front'];
+    }
+
+    // 2. Process any legacy field patterns (doc_{typename}__front / back)
     foreach ($_FILES as $field => $file) {
         if (!is_array($file) || ($file['error'] ?? null) !== UPLOAD_ERR_OK) {
             continue;
         }
-        if (!preg_match('/^doc_(.+?)(?:__(front|back))?$/', (string) $field, $m)) {
+        if (in_array($field, ['doc_front', 'doc_back', 'doc_selfie'])) {
             continue;
         }
-        $typeName = $m[1];
-        $side = $m[2] ?? 'front';
-        if (!isset($allowedTypes[$typeName])) {
-            echo '<div class="alert alert-danger">Unknown document type: ' . Sanitizer::escape($typeName) . '</div>';
-            continue;
+        if (preg_match('/^doc_(.+?)(?:__(front|back))?$/', (string) $field, $m)) {
+            $uploadQueue[] = ['file' => $file, 'type' => $m[1], 'side' => $m[2] ?? 'front'];
         }
-        $t = $allowedTypes[$typeName];
+    }
+
+    foreach ($uploadQueue as $item) {
+        $file = $item['file'];
+        $typeName = $item['type'];
+        $side = $item['side'];
+        $label = $allowedTypes[$typeName]->label ?? ucfirst(str_replace('_', ' ', $typeName));
+
         $check = $validator->validate($file['tmp_name'], $file['name']);
         if (!$check['success']) {
-            echo '<div class="alert alert-danger">' . Sanitizer::escape($t->label) . ' (' . Sanitizer::escape($side) . '): ' . Sanitizer::escape($check['error']) . '</div>';
+            echo '<div class="alert alert-danger" style="max-width: 600px; margin: 15px auto;">' . Sanitizer::escape($label) . ' (' . Sanitizer::escape($side) . '): ' . Sanitizer::escape($check['error']) . '</div>';
             continue;
         }
         $stored = $storage->store($file['tmp_name'], $verificationId, $check['extension']);
         if (!$stored['success']) {
-            echo '<div class="alert alert-danger">' . Sanitizer::escape($t->label) . ' (' . Sanitizer::escape($side) . '): ' . Sanitizer::escape($stored['error']) . '</div>';
+            echo '<div class="alert alert-danger" style="max-width: 600px; margin: 15px auto;">' . Sanitizer::escape($label) . ' (' . Sanitizer::escape($side) . '): ' . Sanitizer::escape($stored['error']) . '</div>';
             continue;
         }
         Capsule::table('mod_cv_documents')->insert([
             'verification_id' => $verificationId,
-            'document_type' => $t->name,
+            'document_type' => $typeName,
             'side' => $side,
             'original_filename' => basename($file['name']),
             'stored_filename' => $stored['stored_filename'],
