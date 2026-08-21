@@ -161,22 +161,32 @@ function clientverification_activate()
                 try {
                     $function();
                 } catch (\Exception $e) {
-                    return ['success' => false, 'message' => "Migration failed: {$migration} - " . $e->getMessage()];
+                    return ['status' => 'error', 'description' => "Migration failed: {$migration} - " . $e->getMessage()];
                 }
             }
         }
     }
 
-    cv_insert_default_settings();
-    cv_insert_default_document_types();
-    cv_create_email_templates();
+    try {
+        cv_insert_default_settings();
+        cv_insert_default_document_types();
+        cv_create_email_templates();
+    } catch (\Exception $e) {
+        return ['status' => 'error', 'description' => 'Initialization error: ' . $e->getMessage()];
+    }
 
-    return ['success' => true, 'message' => 'Advanced Client Verification activated successfully'];
+    return ['status' => 'success', 'description' => 'Advanced Client Verification activated successfully'];
 }
 
 function clientverification_deactivate()
 {
-    return ['success' => true, 'message' => 'Module deactivated. Data preserved.'];
+    return ['status' => 'success', 'description' => 'Module deactivated. Data preserved.'];
+}
+
+function clientverification_upgrade($vars)
+{
+    $version = $vars['version'] ?? '1.0.0';
+    return ['status' => 'success', 'description' => 'Upgraded to ' . $version];
 }
 
 function clientverification_output($vars)

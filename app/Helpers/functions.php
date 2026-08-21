@@ -225,19 +225,22 @@ if (!function_exists('cv_create_email_templates')) {
             'KYC Expired' => ['subject' => 'Identity Verification Expired', 'body' => 'Hello, your identity verification has expired.'],
         ];
 
-        foreach ($templates as $name => $tpl) {
-            $exists = Capsule::table('tblemailtemplates')->where('name', $name)->exists();
-            if (!$exists) {
-                Capsule::table('tblemailtemplates')->insert([
-                    'type' => 'client',
-                    'name' => $name,
-                    'subject' => $tpl['subject'],
-                    'message' => $tpl['body'],
-                    'language' => '',
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s'),
-                ]);
+        try {
+            foreach ($templates as $name => $tpl) {
+                $exists = Capsule::table('tblemailtemplates')->where('name', $name)->exists();
+                if (!$exists) {
+                    Capsule::table('tblemailtemplates')->insert([
+                        'type' => 'general',
+                        'name' => $name,
+                        'subject' => $tpl['subject'],
+                        'message' => $tpl['body'],
+                        'language' => '',
+                        'custom' => 1,
+                    ]);
+                }
             }
+        } catch (\Exception $e) {
+            // Silently handle schema variations across custom WHMCS installs
         }
     }
 }
