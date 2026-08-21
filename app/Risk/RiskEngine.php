@@ -30,6 +30,43 @@ class RiskEngine
 
         $score = $result->riskScore;
         $flags = [];
+        $reasons = [];
+
+        // Check if provider returned risk flags or warnings in decision payload
+        $rawDecision = $result->raw['decision'] ?? ($result->raw ?? []);
+        if (!empty($rawDecision) && is_array($rawDecision)) {
+            // Check ID verification alerts
+            if (!empty($rawDecision['id_verifications']) && is_array($rawDecision['id_verifications'])) {
+                foreach ($rawDecision['id_verifications'] as $idv) {
+                    if (!empty($idv['warnings']) && is_array($idv['warnings'])) {
+                        foreach ($idv['warnings'] as $w) {
+                            $flags[] = 'id_warning_' . ($w['code'] ?? 'issue');
+                            $reasons[] = 'ID Warning: ' . ($w['message'] ?? ($w['code'] ?? 'Document inspection warning'));
+                        }
+                    }
+                }
+            }
+            // Check Face match
+            if (!empty($rawDecision['face_matches']) && is_array($rawDecision['face_matches'])) {
+                foreach ($rawDecision['face_matches'] as $fm) {
+                    if (isset($fm['matched']) && $fm['matched'] === false) {
+                        $flags[] = 'face_mismatch';
+                        $reasons[] = 'Facial biometric match failed: selfie did not match photo ID';
+                        $score += 30;
+                    }
+                }
+            }
+            // Check AML / Sanctions
+            if (!empty($rawDecision['aml_screenings']) && is_array($rawDecision['aml_screenings'])) {
+                foreach ($rawDecision['aml_screenings'] as $aml) {
+                    if (!empty($aml['matches'])) {
+                        $flags[] = 'aml_match';
+                        $reasons[] = 'AML / PEP / Sanctions watchlist match detected';
+                        $score += 50;
+                    }
+                }
+            }
+        }
 
         // Local check: duplicate document detection.
         if (!empty($documentHashes)) {
@@ -41,6 +78,7 @@ class RiskEngine
                     ->first();
                 if ($dup) {
                     $flags[] = 'duplicate_document';
+                    $reasons[] = 'Duplicate Document: Same file hash (SHA-256) was previously submitted on verification #' . $dup->verification_id;
                     $score += 40;
                 }
             }
@@ -54,16 +92,20 @@ class RiskEngine
             ->first();
         if ($existingApproved) {
             $flags[] = 'previous_verification_exists';
+            $reasons[] = 'Existing Approval: Client already has another active approved verification record (#' . $existingApproved->id . ')';
         }
 
-        // Provider error always escalates to review.
+        // Provider error
         if ($result->decision === KycResult::DECISION_ERROR) {
             $flags[] = 'provider_error';
+            $errDetail = $result->raw['error'] ?? ($result->raw['reason'] ?? 'Automated KYC provider returned an error or was unreachable');
+            $reasons[] = 'Provider Error: ' . $errDetail;
             $score = max($score, 80);
         }
 
         if ($result->decision === KycResult::DECISION_DECLINED) {
             $flags[] = 'provider_declined';
+            $reasons[] = 'Provider Declined: Automated verification criteria were not met';
             $score = max($score, 80);
         }
 
@@ -82,6 +124,7 @@ class RiskEngine
             'score' => min(100, $score),
             'level' => $level,
             'flags' => $flags,
+            'reasons' => $reasons,
             'action' => $action,
         ];
     }

@@ -6,12 +6,22 @@ use ClientVerification\Services\HybridVerificationService;
 
 $clientId = (int) (($_SESSION['clientsdetails']['userid'] ?? 0) ?: ($_SESSION['uid'] ?? 0));
 $config = cv_get_config();
-$requestedMethod = $_GET['method'] ?? '';
+$enableDidit = cv_setting('enable_didit', 'yes') === 'yes';
+$enableManual = cv_setting('enable_manual', 'yes') === 'yes';
 $mode = $config['verification_mode'] ?? 'hybrid';
+
+$requestedMethod = $_GET['method'] ?? '';
 if ($requestedMethod === 'manual') {
     $mode = 'manual';
 } elseif ($requestedMethod === 'didit') {
     $mode = 'didit';
+}
+
+if ($mode === 'didit' && (!$enableDidit || empty($config['didit_api_key'] ?? ''))) {
+    $mode = $enableManual ? 'manual' : 'didit';
+}
+if ($mode === 'manual' && !$enableManual) {
+    $mode = ($enableDidit && !empty($config['didit_api_key'] ?? '')) ? 'didit' : 'manual';
 }
 
 // Rate limit: max attempts from config (default 5/hour).

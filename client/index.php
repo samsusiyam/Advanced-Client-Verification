@@ -77,15 +77,21 @@ $status = $verification ? $verification->status : 'unverified';
             </a>
 
         <?php else: 
+            $enableDidit = cv_setting('enable_didit', 'yes') === 'yes';
+            $enableManual = cv_setting('enable_manual', 'yes') === 'yes';
+            $mode = cv_setting('verification_mode', 'hybrid');
+
             $hasDidit = !empty($config['didit_api_key'] ?? ($config['api_key'] ?? '')) && !empty($config['didit_workflow_id'] ?? ($config['workflow_id'] ?? ''));
-            $showChoice = in_array($mode, ['hybrid', 'didit']) && $hasDidit;
+
+            $canDidit = $enableDidit && $hasDidit && in_array($mode, ['hybrid', 'didit']);
+            $canManual = $enableManual && in_array($mode, ['hybrid', 'manual']);
         ?>
             <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #1e293b;">Choose Verification Method</h3>
             <p style="color: #64748b; font-size: 14px; margin-bottom: 28px; max-width: 520px; margin-left: auto; margin-right: auto;">
                 Please select how you would like to complete your identity verification.
             </p>
 
-            <?php if ($showChoice): ?>
+            <?php if ($canDidit && $canManual): ?>
                 <div class="row" style="text-align: left; margin-bottom: 10px;">
                     <!-- Option 1: Instant Didit AI -->
                     <div class="col-sm-6" style="margin-bottom: 18px;">
@@ -120,13 +126,28 @@ $status = $verification ? $verification->status : 'unverified';
                         </div>
                     </div>
                 </div>
-            <?php else: ?>
-                <div style="width: 72px; height: 72px; background: #eff6ff; color: #2563eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; font-size: 32px;">
-                    <i class="fa fa-id-card-o"></i>
+            <?php elseif ($canDidit): ?>
+                <div style="max-width: 420px; margin: 0 auto 20px auto; background: #f8fafc; border: 2px solid #3b82f6; border-radius: 10px; padding: 26px 20px; text-align: center;">
+                    <div style="width: 54px; height: 54px; background: #eff6ff; color: #2563eb; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px auto;">
+                        <i class="fa fa-bolt"></i>
+                    </div>
+                    <h4 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #1e293b;">Instant AI Verification</h4>
+                    <p style="font-size: 13px; color: #64748b; margin-bottom: 20px; line-height: 1.5;">Automated biometric facial match and document scanning. Fast and secure.</p>
+                    <a href="index.php?m=clientverification&action=start&method=didit" class="btn btn-primary btn-lg" style="font-weight: 600; padding: 12px 32px; border-radius: 6px;">
+                        <i class="fa fa-flash"></i> Start Instant Verification &raquo;
+                    </a>
                 </div>
-                <a href="index.php?m=clientverification&action=start&method=manual" class="btn btn-primary btn-lg" style="font-weight: 600; padding: 12px 32px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
-                    <i class="fa fa-arrow-right"></i> Start Identity Verification
-                </a>
+            <?php else: ?>
+                <div style="max-width: 420px; margin: 0 auto 20px auto; background: #f8fafc; border: 2px solid #10b981; border-radius: 10px; padding: 26px 20px; text-align: center;">
+                    <div style="width: 54px; height: 54px; background: #f0fdf4; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 16px auto;">
+                        <i class="fa fa-cloud-upload"></i>
+                    </div>
+                    <h4 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #1e293b;">Manual Document Upload</h4>
+                    <p style="font-size: 13px; color: #64748b; margin-bottom: 20px; line-height: 1.5;">Upload clear photos of your ID or Passport for review by our compliance team.</p>
+                    <a href="index.php?m=clientverification&action=start&method=manual" class="btn btn-success btn-lg" style="font-weight: 600; padding: 12px 32px; border-radius: 6px; background: #16a34a; border-color: #16a34a;">
+                        <i class="fa fa-upload"></i> Upload Documents &raquo;
+                    </a>
+                </div>
             <?php endif; ?>
         <?php endif; ?>
     </div>

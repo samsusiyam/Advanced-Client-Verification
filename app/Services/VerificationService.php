@@ -122,6 +122,47 @@ class VerificationService
         return $affected;
     }
 
+    public static function delete(int $verificationId, int $adminId = 0): bool
+    {
+        $v = Capsule::table('mod_cv_verifications')->where('id', $verificationId)->first();
+        if (!$v) {
+            return false;
+        }
+
+        // 1. Delete physical files from disk securely
+        $docs = Capsule::table('mod_cv_documents')->where('verification_id', $verificationId)->get();
+        $storage = new \ClientVerification\Storage\DocumentStorage(cv_setting('storage_path', ''));
+        foreach ($docs as $doc) {
+            if (!empty($doc->storage_path)) {
+                $storage->delete($doc->storage_path);
+            }
+        }
+
+        // Clean up empty directory if applicable
+        $storageBase = cv_setting('storage_path', '');
+        if (empty($storageBase)) {
+            $storageBase = __DIR__ . '/../../storage';
+        }
+        $docDir = rtrim(str_replace('\\', '/', $storageBase), '/') . '/documents/' . $verificationId;
+        if (is_dir($docDir)) {
+            @rmdir($docDir);
+        }
+
+        // 2. Delete database records
+        Capsule::table('mod_cv_documents')->where('verification_id', $verificationId)->delete();
+        Capsule::table('mod_cv_personal_data')->where('verification_id', $verificationId)->delete();
+
+        // 3. Log audit
+        if (function_exists('cv_log_audit')) {
+            cv_log_audit($verificationId, 'verification_deleted', $adminId, 'Verification #' . $verificationId . ' deleted by admin #' . $adminId);
+        }
+
+        // 4. Delete verification row
+        Capsule::table('mod_cv_verifications')->where('id', $verificationId)->delete();
+
+        return true;
+    }
+
     public static function toEntity(object $row): VerificationEntity
     {
         $personal = Capsule::table('mod_cv_personal_data')->where('verification_id', $row->id)->first();

@@ -166,6 +166,33 @@ if (!function_exists('cv_log_audit')) {
             'ip' => \ClientVerification\Security\RateLimiter::getClientIp(),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
+
+        // Auto-prune old logs according to retention settings
+        cv_prune_audit_logs();
+    }
+}
+
+if (!function_exists('cv_prune_audit_logs')) {
+    /**
+     * Prune audit logs and webhook logs older than configured retention days.
+     * If retention is 0 or unset, logs are kept forever.
+     */
+    function cv_prune_audit_logs(?int $days = null): int
+    {
+        if ($days === null) {
+            $days = (int) cv_setting('audit_log_retention_days', 0);
+        }
+        if ($days <= 0) {
+            return 0; // 0 means keep forever (never auto-delete)
+        }
+
+        $cutoff = date('Y-m-d H:i:s', strtotime("-{$days} days"));
+        $deleted = Capsule::table('mod_cv_audit_logs')->where('created_at', '<', $cutoff)->delete();
+        try {
+            Capsule::table('mod_cv_webhook_events')->where('received_at', '<', $cutoff)->delete();
+        } catch (\Throwable $e) {}
+
+        return (int) $deleted;
     }
 }
 

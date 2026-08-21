@@ -15,8 +15,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cv_save_settings'])) 
         $fields = [
             'enabled',
             'verification_mode',
+            'enable_didit',
+            'enable_manual',
             'verification_expiry_days',
             'rate_limit_attempts',
+            'audit_log_retention_days',
             'didit_api_key',
             'didit_workflow_id',
             'didit_webhook_secret',
@@ -37,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cv_save_settings'])) 
             // Checkbox handling
             if (in_array($f, ['didit_auto_approve', 'storage_encryption'], true)) {
                 $val = isset($_POST[$f]) ? '1' : '0';
-            } elseif ($f === 'enabled') {
+            } elseif (in_array($f, ['enabled', 'enable_didit', 'enable_manual'], true)) {
                 $val = isset($_POST[$f]) ? 'yes' : 'no';
             } else {
                 $val = trim((string)$val);
@@ -264,31 +267,49 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
     <!-- TAB 1: GENERAL -->
     <div class="cv-tab-panel <?php echo $activeTab === 'general' ? 'active' : ''; ?>" id="tab-general">
         <div class="cv-section">
-            <div class="cv-section-title"><i class="fa fa-power-off text-primary"></i> Module Activation</div>
-            <div class="cv-section-desc">Control whether identity verification is active across WHMCS.</div>
+            <div class="cv-section-title"><i class="fa fa-power-off text-primary"></i> Module Activation &amp; Methods</div>
+            <div class="cv-section-desc">Control which verification methods are available to your customers.</div>
             
-            <div class="cv-field">
+            <div class="cv-field" style="margin-bottom: 14px;">
                 <label style="font-size: 14px; font-weight: 600; cursor: pointer;">
                     <input type="checkbox" name="enabled" value="yes" <?php echo cv_setting('enabled', 'yes') === 'yes' ? 'checked' : ''; ?>>
                     Enable Client Identity Verification Module
                 </label>
-                <div class="cv-field-hint">When unchecked, verification checks are bypassed.</div>
+                <div class="cv-field-hint">When unchecked, all verification prompts and restrictions are bypassed.</div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="enable_didit" value="yes" <?php echo cv_setting('enable_didit', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <i class="fa fa-bolt text-primary"></i> Allow Didit AI Instant Verification
+                    </label>
+                    <div class="cv-field-hint">Allows clients to complete automated biometric &amp; AI document checks in 1-2 minutes.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="enable_manual" value="yes" <?php echo cv_setting('enable_manual', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <i class="fa fa-upload text-success"></i> Allow Manual Document Upload
+                    </label>
+                    <div class="cv-field-hint">Allows clients to submit passport, national ID, or driver's license for staff review.</div>
+                </div>
             </div>
         </div>
 
         <div class="cv-section">
-            <div class="cv-section-title"><i class="fa fa-cogs text-primary"></i> Verification Workflow</div>
-            <div class="cv-section-desc">Select how customer identity submissions are handled.</div>
+            <div class="cv-section-title"><i class="fa fa-cogs text-primary"></i> Verification Workflow &amp; Retention</div>
+            <div class="cv-section-desc">Select customer workflow preferences and log retention policies.</div>
 
             <div class="row">
                 <div class="col-md-6 cv-field">
-                    <label class="cv-field-label">Verification Mode</label>
+                    <label class="cv-field-label">Default Workflow Mode</label>
                     <select name="verification_mode" class="form-control">
-                        <option value="hybrid" <?php echo cv_setting('verification_mode', 'hybrid') === 'hybrid' ? 'selected' : ''; ?>>Hybrid (Didit AI Automated + Staff Fallback) [Recommended]</option>
+                        <option value="hybrid" <?php echo cv_setting('verification_mode', 'hybrid') === 'hybrid' ? 'selected' : ''; ?>>Hybrid (Client can choose Instant or Manual) [Recommended]</option>
                         <option value="didit" <?php echo cv_setting('verification_mode', 'hybrid') === 'didit' ? 'selected' : ''; ?>>Didit Automated Only (Instant AI Verification)</option>
                         <option value="manual" <?php echo cv_setting('verification_mode', 'hybrid') === 'manual' ? 'selected' : ''; ?>>Manual Only (Staff manually reviews all uploads)</option>
                     </select>
-                    <div class="cv-field-hint">Hybrid gives the fastest customer onboarding with manual review as safety net.</div>
+                    <div class="cv-field-hint">Hybrid gives the best customer experience with staff review as safety net.</div>
                 </div>
 
                 <div class="col-md-6 cv-field">
@@ -299,6 +320,12 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
             </div>
 
             <div class="row">
+                <div class="col-md-6 cv-field">
+                    <label class="cv-field-label">Audit Log Retention (Days)</label>
+                    <input type="number" name="audit_log_retention_days" class="form-control" value="<?php echo htmlspecialchars(cv_setting('audit_log_retention_days', '0')); ?>" min="0" max="3650">
+                    <div class="cv-field-hint">Days to retain compliance audit logs. Enter <strong>0</strong> to keep logs forever (never auto-delete).</div>
+                </div>
+
                 <div class="col-md-6 cv-field">
                     <label class="cv-field-label">Max Attempts per Hour</label>
                     <input type="number" name="rate_limit_attempts" class="form-control" value="<?php echo htmlspecialchars(cv_setting('rate_limit_attempts', '5')); ?>" min="1" max="50">

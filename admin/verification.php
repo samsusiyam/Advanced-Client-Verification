@@ -67,6 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && Csrf::ch
             $feedbackMessage = 'Verification set to Under Review status.';
             $feedbackType = 'info';
             break;
+        case 'delete':
+            VerificationService::delete($id, $adminId);
+            header('Location: addonmodules.php?module=clientverification&action=verifications&deleted=1');
+            echo '<script>window.location.href = "addonmodules.php?module=clientverification&action=verifications&deleted=1";</script>';
+            exit;
     }
 }
 
@@ -162,18 +167,50 @@ $audit = json_decode($row->audit_log ?? '[]', true);
                     <td><code><?php echo htmlspecialchars($row->client_ref ?: 'CV-' . $row->id); ?></code></td>
                 </tr>
                 <tr>
-                    <td style="color: #64748b;">Risk Assessment:</td>
+                    <td style="color: #64748b; vertical-align: top;">Risk Assessment:</td>
                     <td>
+                        <div style="margin-bottom: 6px;">
+                            <?php
+                            $riskColor = match($row->risk_level) {
+                                'high' => '#ef4444',
+                                'medium' => '#f59e0b',
+                                default => '#10b981',
+                            };
+                            ?>
+                            <span style="font-weight: 700; color: <?php echo $riskColor; ?>;">
+                                <i class="fa fa-circle"></i> <?php echo ucfirst(htmlspecialchars($row->risk_level)); ?> Risk (Score: <?php echo htmlspecialchars($row->risk_score); ?>/100)
+                            </span>
+                        </div>
+
                         <?php
-                        $riskColor = match($row->risk_level) {
-                            'high' => '#ef4444',
-                            'medium' => '#f59e0b',
-                            default => '#10b981',
-                        };
+                        $reasons = [];
+                        if (!empty($row->risk_reasons)) {
+                            $reasons = json_decode($row->risk_reasons, true) ?: [];
+                        }
+                        if (empty($reasons) && !empty($row->risk_flags)) {
+                            $flags = json_decode($row->risk_flags, true) ?: [];
+                            foreach ($flags as $f) {
+                                $reasons[] = ucwords(str_replace('_', ' ', $f));
+                            }
+                        }
                         ?>
-                        <span style="font-weight: 700; color: <?php echo $riskColor; ?>;">
-                            <i class="fa fa-circle"></i> <?php echo ucfirst(htmlspecialchars($row->risk_level)); ?> Risk (Score: <?php echo htmlspecialchars($row->risk_score); ?>/100)
-                        </span>
+
+                        <?php if (!empty($reasons)): ?>
+                            <div style="background: <?php echo $row->risk_level === 'high' ? '#fef2f2' : '#fffbeb'; ?>; border: 1px solid <?php echo $row->risk_level === 'high' ? '#fecaca' : '#fde68a'; ?>; border-radius: 6px; padding: 8px 12px; margin-top: 4px;">
+                                <div style="font-size: 11px; font-weight: 700; color: <?php echo $row->risk_level === 'high' ? '#991b1b' : '#92400e'; ?>; margin-bottom: 3px;">
+                                    <i class="fa fa-exclamation-triangle"></i> Identified Risk Factors:
+                                </div>
+                                <ul style="margin: 0; padding-left: 16px; font-size: 11px; color: <?php echo $row->risk_level === 'high' ? '#7f1d1d' : '#78350f'; ?>; line-height: 1.4;">
+                                    <?php foreach ($reasons as $reason): ?>
+                                        <li><?php echo htmlspecialchars($reason); ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            </div>
+                        <?php else: ?>
+                            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 4px 8px; font-size: 11px; color: #166534; margin-top: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                                <i class="fa fa-check-circle"></i> Clean submission (no flags)
+                            </div>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php if ($row->didit_session_id): ?>
@@ -226,16 +263,21 @@ $audit = json_decode($row->audit_log ?? '[]', true);
     <div class="col-md-7">
         <!-- Admin Decision Box -->
         <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); padding: 20px; margin-bottom: 20px;">
-            <h4 style="margin: 0 0 14px 0; font-size: 15px; font-weight: 700; color: #1e293b; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9;">
-                <i class="fa fa-gavel text-primary"></i> Admin Decision &amp; Actions
-            </h4>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9;">
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #1e293b;">
+                    <i class="fa fa-gavel text-primary"></i> Admin Decision &amp; Actions
+                </h4>
+                <button type="button" class="btn btn-danger btn-xs" onclick="if(confirm('Are you sure you want to PERMANENTLY DELETE this verification record (#<?php echo (int)$id; ?>) and all uploaded files? This action cannot be undone.')) { document.getElementById('cv_delete_form').submit(); }">
+                    <i class="fa fa-trash"></i> Delete Verification
+                </button>
+            </div>
 
             <form method="post" action="addonmodules.php?module=clientverification&action=verification&id=<?php echo (int) $id; ?>">
                 <?php echo Csrf::field(); ?>
                 
                 <div class="form-group" style="margin-bottom: 14px;">
                     <label style="font-size: 13px; font-weight: 600; color: #334155;">Decision Note / Reason:</label>
-                    <textarea name="note" class="form-control" rows="2" placeholder="Optional internal note or reason for decision..."></textarea>
+                    <textarea name="note" class="form-control" rows="2" placeholder="Optional note or client rejection reason..."></textarea>
                 </div>
 
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -255,6 +297,11 @@ $audit = json_decode($row->audit_log ?? '[]', true);
                         <i class="fa fa-ban"></i> Suspend
                     </button>
                 </div>
+            </form>
+
+            <form method="post" id="cv_delete_form" action="addonmodules.php?module=clientverification&action=verification&id=<?php echo (int) $id; ?>" style="display: none;">
+                <?php echo Csrf::field(); ?>
+                <input type="hidden" name="action" value="delete">
             </form>
         </div>
 

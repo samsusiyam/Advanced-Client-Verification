@@ -130,13 +130,22 @@ class HybridVerificationService
                 'didit_decision' => $result->decision,
             ]);
 
-        $risk = (new RiskEngine())->evaluate($verificationId, $row->client_id, $result, $documentHashes);
+        try {
+            if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'risk_reasons')) {
+                Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                    $table->text('risk_reasons')->nullable();
+                    $table->text('risk_flags')->nullable();
+                });
+            }
+        } catch (\Throwable $e) {}
 
         Capsule::table('mod_cv_verifications')
             ->where('id', $verificationId)
             ->update([
                 'risk_score' => $risk['score'],
                 'risk_level' => $risk['level'],
+                'risk_flags' => json_encode($risk['flags'] ?? []),
+                'risk_reasons' => json_encode($risk['reasons'] ?? []),
             ]);
 
         $config = cv_get_config();
