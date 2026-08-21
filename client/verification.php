@@ -91,6 +91,16 @@ if ($types->isEmpty()) {
                         <i class="fa fa-refresh"></i> Start New Verification &raquo;
                     </a>
                 </div>
+            <?php elseif ($v->status === 'under_review'): ?>
+                <div style="text-align: center; padding: 10px 10px 20px 10px;">
+                    <div style="width: 72px; height: 72px; background: #fef3c7; color: #d97706; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px auto; font-size: 32px;">
+                        <i class="fa fa-clock-o"></i>
+                    </div>
+                    <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #92400e;">Account Verification Under Review</h3>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 24px; max-width: 580px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+                        Your identity documents have been submitted securely and are currently being reviewed by our compliance team. We will notify you by email once your verification is completed.
+                    </p>
+                </div>
             <?php else: 
                 $enableDidit = cv_setting('enable_didit', 'yes') === 'yes' && !empty($config['didit_api_key'] ?? '') && !empty($config['didit_workflow_id'] ?? '');
                 $globalMode = $config['verification_mode'] ?? 'hybrid';
@@ -516,7 +526,9 @@ if ($types->isEmpty()) {
 
             <?php if (!$docs->isEmpty() && in_array($v->status, ['under_review', 'approved'])): ?>
                 <div style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-                    <h4 style="margin: 0 0 14px 0; font-size: 15px; font-weight: 700; color: #1e293b;">Uploaded Documents</h4>
+                    <h4 style="margin: 0 0 14px 0; font-size: 15px; font-weight: 700; color: #1e293b;">
+                        <i class="fa fa-folder-open text-primary"></i> Uploaded Documents (<?php echo count($docs); ?>)
+                    </h4>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <?php foreach ($docs as $d): 
                             $docBadge = match($d->status) {
@@ -524,6 +536,7 @@ if ($types->isEmpty()) {
                                 'rejected' => '<span class="label label-danger">Rejected</span>',
                                 default => '<span class="label label-warning">Pending Review</span>',
                             };
+                            $sizeKb = round(($d->file_size ?? 0) / 1024, 1);
                         ?>
                             <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px;">
                                 <div>
@@ -531,7 +544,12 @@ if ($types->isEmpty()) {
                                     <?php if ($d->side): ?>
                                         <span class="label label-default" style="font-size: 10px;"><?php echo htmlspecialchars(strtoupper($d->side)); ?></span>
                                     <?php endif; ?>
-                                    <div style="font-size: 11px; color: #64748b; margin-top: 2px;"><?php echo htmlspecialchars($d->original_filename); ?></div>
+                                    <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+                                        <i class="fa fa-file-image-o"></i> <?php echo htmlspecialchars($d->original_filename); ?>
+                                        <?php if ($sizeKb > 0): ?>
+                                            &bull; <?php echo $sizeKb; ?> KB
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                                 <div>
                                     <?php echo $docBadge; ?>
