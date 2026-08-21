@@ -92,11 +92,18 @@ if ($isGet || !empty($sessionId)) {
                 );
 
                 $result = $provider->getStatus($sessionId);
-                if ($result->status !== 'error') {
-                    \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
-                } elseif (strcasecmp($statusParam, 'Approved') === 0) {
-                    \ClientVerification\Services\VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_browser_approved');
+                if ($result->status === 'error' && strcasecmp($statusParam, 'Approved') === 0) {
+                    $result = new \ClientVerification\Providers\KycResult(
+                        $sessionId,
+                        'approved',
+                        \ClientVerification\Providers\KycResult::DECISION_APPROVED,
+                        0,
+                        'low',
+                        ['callback_status' => 'Approved']
+                    );
                 }
+
+                \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
             } catch (\Throwable $e) {
                 if (strcasecmp($statusParam, 'Approved') === 0) {
                     \ClientVerification\Services\VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_browser_approved');

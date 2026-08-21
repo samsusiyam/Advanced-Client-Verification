@@ -53,11 +53,18 @@ if ($verificationId && $sessionId) {
             );
 
             $result = $provider->getStatus($sessionId);
-            if ($result->status !== 'error') {
-                HybridVerificationService::applyResult($verificationId, $result);
-            } elseif (strcasecmp($statusParam, 'Approved') === 0) {
-                VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_callback_approved');
+            if ($result->status === 'error' && strcasecmp($statusParam, 'Approved') === 0) {
+                $result = new \ClientVerification\Providers\KycResult(
+                    $sessionId,
+                    'approved',
+                    \ClientVerification\Providers\KycResult::DECISION_APPROVED,
+                    0,
+                    'low',
+                    ['callback_status' => 'Approved']
+                );
             }
+
+            HybridVerificationService::applyResult($verificationId, $result);
         } catch (\Throwable $e) {
             if (strcasecmp($statusParam, 'Approved') === 0) {
                 VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_callback_approved');

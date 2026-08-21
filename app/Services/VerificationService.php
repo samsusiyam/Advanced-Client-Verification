@@ -33,6 +33,16 @@ class VerificationService
 
     public static function updateStatus(int $verificationId, string $status, int $adminId = 0, string $note = ''): void
     {
+        $prevRow = self::find($verificationId);
+        if (!$prevRow) {
+            return;
+        }
+
+        // Idempotency check: if already in this status, do not re-send emails or duplicate updates
+        if ($prevRow->status === $status) {
+            return;
+        }
+
         $data = ['status' => $status, 'updated_at' => date('Y-m-d H:i:s')];
         if (in_array($status, ['approved', 'rejected'], true)) {
             $data['reviewed_at'] = date('Y-m-d H:i:s');

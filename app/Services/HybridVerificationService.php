@@ -153,12 +153,13 @@ class HybridVerificationService
             return 'not_found';
         }
 
-        Capsule::table('mod_cv_verifications')
-            ->where('id', $verificationId)
-            ->update([
-                'didit_status' => $result->status,
-                'didit_decision' => $result->decision,
-            ]);
+        // Idempotency: If already in a terminal state (approved or rejected), do not re-process or re-notify!
+        if (in_array($row->status, ['approved', 'rejected'], true)) {
+            return $row->status;
+        }
+
+        // Evaluate through local RiskEngine
+        $risk = (new RiskEngine())->evaluate($verificationId, (int) $row->client_id, $result, $documentHashes);
 
         try {
             if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'risk_reasons')) {
@@ -172,24 +173,19 @@ class HybridVerificationService
         Capsule::table('mod_cv_verifications')
             ->where('id', $verificationId)
             ->update([
+                'didit_status' => $result->status,
+                'didit_decision' => $result->decision,
                 'risk_score' => $risk['score'],
                 'risk_level' => $risk['level'],
                 'risk_flags' => json_encode($risk['flags'] ?? []),
                 'risk_reasons' => json_encode($risk['reasons'] ?? []),
+                'updated_at' => date('Y-m-d H:i:s'),
             ]);
 
         $config = cv_get_config();
         $autoApproveRaw = $config['didit_auto_approve'] ?? '1';
         $autoApprove = !in_array(strtolower((string) $autoApproveRaw), ['off', '0', '', 'no'], true);
         $decision = $risk['action'];
-
-        // Alert admin if high risk detected
-        if (($risk['level'] ?? '') === 'high') {
-            Notifier::adminHighRisk($verificationId, (int) $row->client_id, (float) ($risk['score'] ?? 0), (array) ($risk['reasons'] ?? []));
-        }
-        if ($row->verification_method === 'didit') {
-            Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, (string) $result->status);
-        }
 
         // Provider error and Didit mode -> manual review, never approve.
         if ($result->decision === KycResult::DECISION_ERROR && $row->verification_method !== 'manual') {
@@ -201,24 +197,40 @@ class HybridVerificationService
             $decision = 'review';
         }
 
+        // Alert admin if high risk detected
+        if (($risk['level'] ?? '') === 'high') {
+            Notifier::adminHighRisk($verificationId, (int) $row->client_id, (float) ($risk['score'] ?? 0), (array) ($risk['reasons'] ?? []));
+        }
+
         switch ($decision) {
             case 'approve':
                 if ($autoApprove) {
                     VerificationService::updateStatus($verificationId, 'approved', 0, 'auto_approved');
+                    if ($row->verification_method === 'didit') {
+                        Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, 'Approved');
+                    }
                     return 'approved';
                 }
                 VerificationService::updateStatus($verificationId, 'under_review', 0, 'pending_admin_review');
+                if ($row->verification_method === 'didit') {
+                    Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, 'Under Review (Pending Approval)');
+                }
                 return 'review';
+
             case 'reject':
                 VerificationService::updateStatus($verificationId, 'rejected', 0, implode(',', $risk['flags']));
+                if ($row->verification_method === 'didit') {
+                    Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, 'Rejected (' . implode(', ', $risk['flags']) . ')');
+                }
                 return 'rejected';
+
             case 'review':
             default:
-                Capsule::table('mod_cv_verifications')
-                    ->where('id', $verificationId)
-                    ->update(['status' => 'under_review', 'manual_review_required' => 1, 'updated_at' => date('Y-m-d H:i:s')]);
-                cv_log_audit($verificationId, 'manual_review_required', 0, implode(',', $risk['flags']));
-                Notifier::reviewRequired($row->client_id);
+                VerificationService::updateStatus($verificationId, 'under_review', 0, implode(',', $risk['flags'] ?: ['review_required']));
+                if ($row->verification_method === 'didit') {
+                    $statusLabel = ($result->status === 'error') ? 'Under Review (Manual Inspection Required)' : 'Under Review';
+                    Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, $statusLabel);
+                }
                 OutboundWebhookShim($verificationId);
                 return 'review';
         }
