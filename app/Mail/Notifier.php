@@ -14,13 +14,24 @@ class Notifier
      */
     public static function send(string $template, int $clientId, array $vars = []): bool
     {
-        if (function_exists('sendMessage')) {
-            try {
+        try {
+            if (function_exists('localAPI')) {
+                $res = localAPI('SendEmail', [
+                    'messagename' => $template,
+                    'id' => $clientId,
+                    'customvars' => $vars,
+                ]);
+                if (($res['result'] ?? '') === 'success') {
+                    return true;
+                }
+            }
+            if (function_exists('sendMessage')) {
                 sendMessage($template, $clientId, $vars);
                 return true;
-            } catch (\Exception $e) {
-                return false;
             }
+        } catch (\Throwable $e) {
+            // Silently catch all errors to avoid interrupting admin/webhook actions
+            return false;
         }
         return false;
     }

@@ -36,11 +36,18 @@ if ($client) {
 $result = HybridVerificationService::start($clientId, $mode, $personal, $config);
 
 if (!empty($result['redirect_url'])) {
-    // Didit / automated flow: redirect client to provider.
-    header('Location: ' . $result['redirect_url']);
+    if (!headers_sent()) {
+        header('Location: ' . $result['redirect_url']);
+    }
+    echo '<script>window.location.href = ' . json_encode($result['redirect_url']) . ';</script>';
+    echo '<div style="text-align: center; padding: 40px;"><p>Redirecting to identity verification...</p><a href="' . htmlspecialchars($result['redirect_url']) . '" class="btn btn-primary">Click here if not redirected</a></div>';
     exit;
 }
 
-// Manual / hybrid-without-didit: go to document upload page.
-header('Location: index.php?m=clientverification&action=verification&id=' . $result['verification_id']);
+$dest = 'index.php?m=clientverification&action=verification&id=' . (int) $result['verification_id'];
+if (!headers_sent()) {
+    header('Location: ' . $dest);
+}
+echo '<script>window.location.href = ' . json_encode($dest) . ';</script>';
+echo '<div style="text-align: center; padding: 40px;"><p>Redirecting to document upload...</p><a href="' . htmlspecialchars($dest) . '" class="btn btn-primary">Continue</a></div>';
 exit;

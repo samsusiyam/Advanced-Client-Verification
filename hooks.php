@@ -38,7 +38,7 @@ function cv_render_client_banner(string $context = 'general'): string
     $status = $activeVerification ? $activeVerification->status : 'unverified';
 
     if ($status === 'under_review') {
-        return '<div class="cv-alert-banner" style="margin: 15px 0 25px 0; background: #fefce8; border: 1px solid #fef08a; border-radius: 10px; padding: 20px 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">
+        $html = '<div id="cv-verification-alert-banner" class="cv-alert-banner" style="margin: 20px 0 25px 0; background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; display: none;">
             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
                 <div style="display: flex; align-items: flex-start; gap: 14px;">
                     <div style="color: #ca8a04; font-size: 22px; line-height: 1.2;">
@@ -56,31 +56,59 @@ function cv_render_client_banner(string $context = 'general'): string
                 </div>
             </div>
         </div>';
-    }
+    } else {
+        $msg = 'To fully use our services, verify your identity.';
+        if ($context === 'cart') {
+            $msg = 'Identity verification is required before checkout for items in your cart.';
+        }
 
-    $msg = 'To fully use our services, verify your identity.';
-    if ($context === 'cart') {
-        $msg = 'Identity verification is required before checkout for items in your cart.';
-    }
-
-    return '<div class="cv-alert-banner" style="margin: 15px 0 25px 0; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 20px 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
-            <div style="display: flex; align-items: flex-start; gap: 14px;">
-                <div style="color: #d97706; font-size: 22px; line-height: 1.2;">
-                    <i class="fa fa-exclamation-triangle"></i>
+        $html = '<div id="cv-verification-alert-banner" class="cv-alert-banner" style="margin: 20px 0 25px 0; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; display: none;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+                <div style="display: flex; align-items: flex-start; gap: 14px;">
+                    <div style="color: #d97706; font-size: 22px; line-height: 1.2;">
+                        <i class="fa fa-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <h4 style="margin: 0 0 4px 0; font-size: 17px; font-weight: 700; color: #c2410c;">Account Verification Required</h4>
+                        <p style="margin: 0; color: #9a3412; font-size: 13px;">' . htmlspecialchars($msg) . '</p>
+                    </div>
                 </div>
                 <div>
-                    <h4 style="margin: 0 0 4px 0; font-size: 17px; font-weight: 700; color: #c2410c;">Account Verification Required</h4>
-                    <p style="margin: 0; color: #9a3412; font-size: 13px;">' . htmlspecialchars($msg) . '</p>
+                    <a href="index.php?m=clientverification" class="btn" style="background: #c2410c; color: #ffffff; font-weight: 600; font-size: 13px; padding: 8px 20px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; border: none; box-shadow: 0 2px 4px rgba(194, 65, 12, 0.2);">
+                        <i class="fa fa-user"></i> Verify Now
+                    </a>
                 </div>
             </div>
-            <div>
-                <a href="index.php?m=clientverification" class="btn" style="background: #c2410c; color: #ffffff; font-weight: 600; font-size: 13px; padding: 8px 20px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; border: none; box-shadow: 0 2px 4px rgba(194, 65, 12, 0.2);">
-                    <i class="fa fa-user"></i> Verify Now
-                </a>
-            </div>
-        </div>
-    </div>';
+        </div>';
+    }
+
+    $js = '<script>
+    (function() {
+        function placeCvBanner() {
+            var banner = document.getElementById("cv-verification-alert-banner");
+            if (!banner) return;
+            var target = document.querySelector(".client-home-panels")
+                || document.querySelector(".dashboard-container")
+                || document.querySelector(".tiles-container")
+                || document.querySelector("#main-body .container .row")
+                || document.querySelector(".main-content .header-lined")
+                || document.querySelector(".primary-content")
+                || document.querySelector("#main-body .container")
+                || document.querySelector(".main-content");
+            if (target && banner.parentNode !== target.parentNode) {
+                target.parentNode.insertBefore(banner, target);
+            }
+            banner.style.display = "block";
+        }
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", placeCvBanner);
+        } else {
+            placeCvBanner();
+        }
+    })();
+    </script>';
+
+    return $html . $js;
 }
 
 /**

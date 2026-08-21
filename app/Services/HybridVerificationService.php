@@ -51,6 +51,7 @@ class HybridVerificationService
         cv_log_audit($verificationId, 'verification_started', 0, 'method=' . $method);
 
         $redirectUrl = '';
+        $useDidit = ($method === 'didit' || $method === 'hybrid');
         $apiKey = $config['didit_api_key'] ?? ($config['api_key'] ?? '');
         $workflowId = $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? '');
 
@@ -73,21 +74,17 @@ class HybridVerificationService
                 $redirectUrl = $session->redirectUrl;
                 Notifier::started($clientId);
             } catch (\Exception $e) {
-                // Provider error -> manual review fallback (never auto-approve).
+                // Provider error -> fallback to manual document upload form
                 Capsule::table('mod_cv_verifications')
                     ->where('id', $verificationId)
-                    ->update(['status' => 'under_review', 'manual_review_required' => 1]);
+                    ->update(['status' => 'pending', 'manual_review_required' => 1]);
                 cv_log_audit($verificationId, 'provider_error', 0, $e->getMessage());
             }
-        } elseif ($method === 'manual') {
-            Capsule::table('mod_cv_verifications')
-                ->where('id', $verificationId)
-                ->update(['status' => 'pending']);
         } else {
-            // Hybrid but Didit not configured -> manual review.
+            // Manual mode or Didit credentials missing -> allow manual document upload
             Capsule::table('mod_cv_verifications')
                 ->where('id', $verificationId)
-                ->update(['status' => 'under_review', 'manual_review_required' => 1]);
+                ->update(['status' => 'pending', 'manual_review_required' => 1]);
         }
 
         return [

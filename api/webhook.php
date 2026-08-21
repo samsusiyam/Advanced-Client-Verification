@@ -46,16 +46,16 @@ if ($rawBody === false) {
     $rawBody = '';
 }
 
-$headers = function_exists('getallheaders') ? getallheaders() : [];
-if (empty($headers)) {
-    $headers = [];
-    foreach ($_SERVER as $k => $v) {
-        if (strpos($k, 'HTTP_') === 0) {
-            $name = str_replace('_', '-', strtolower(substr($k, 5)));
-            $headers[$name] = $v;
-        }
+$headers = function_exists('getallheaders') ? (getallheaders() ?: []) : [];
+foreach ($_SERVER as $k => $v) {
+    if (strpos($k, 'HTTP_') === 0) {
+        $name = str_replace('_', '-', strtolower(substr($k, 5)));
+        $headers[$name] = $v;
+        $headers[strtolower($k)] = $v;
     }
 }
+
+header('Content-Type: application/json');
 
 $config = cv_get_config();
 $config['callback_url'] = cv_callback_url();

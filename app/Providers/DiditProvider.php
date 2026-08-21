@@ -61,7 +61,7 @@ class DiditProvider implements KycProviderInterface
 
         $data = $response['data'];
         $sessionId = $data['session_id'] ?? ($data['id'] ?? '');
-        $url = $data['url'] ?? '';
+        $url = $data['url'] ?? ($data['session_url'] ?? ($data['sessionUrl'] ?? ''));
 
         if (!$sessionId) {
             throw new \RuntimeException('Didit session creation failed: missing session id');
@@ -97,38 +97,51 @@ class DiditProvider implements KycProviderInterface
     }
 
     /**
-     * Verify the Didit webhook signature.
-     * Header format: Didit-Signature: t=<timestamp>,v1=<hmac>
-     * Signature is HMAC-SHA256 of "<timestamp>.<rawBody>" with the webhook secret.
+     * Verify the Didit webhook signature across all Didit header variants.
+     * Supports: X-Signature, X-Signature-V2, X-Signature-Simple, and Didit-Signature
      */
-    public function verifyWebhook(string $rawBody, string $signatureHeader): bool
+    public function verifyWebhook(string $rawBody, $signatureHeader, ?int $timestamp = null): bool
     {
-        if (!$signatureHeader || !$this->webhookSecret) {
+        if (empty($this->webhookSecret) || empty($signatureHeader)) {
             return false;
         }
 
-        $parts = [];
-        foreach (explode(',', $signatureHeader) as $pair) {
-            $kv = explode('=', $pair, 2);
-            if (count($kv) === 2) {
-                $parts[$kv[0]] = $kv[1];
+        $sig = is_array($signatureHeader) ? ($signatureHeader[0] ?? '') : (string) $signatureHeader;
+        $sig = trim($sig);
+
+        // Check if header is in t=...,v1=... format
+        if (strpos($sig, 't=') !== false && strpos($sig, '=') !== false) {
+            $parts = [];
+            foreach (explode(',', $sig) as $pair) {
+                $kv = explode('=', $pair, 2);
+                if (count($kv) === 2) {
+                    $parts[trim($kv[0])] = trim($kv[1]);
+                }
+            }
+            if (isset($parts['t'])) {
+                $timestamp = (int) $parts['t'];
+            }
+            $hash = $parts['v2'] ?? ($parts['v1'] ?? '');
+            if (!empty($hash)) {
+                $sig = $hash;
             }
         }
 
-        if (!isset($parts['t'], $parts['v1'])) {
-            return false;
+        // Direct payload HMAC comparison
+        $expectedDirect = hash_hmac('sha256', $rawBody, $this->webhookSecret);
+        if (hash_equals($expectedDirect, $sig)) {
+            return true;
         }
 
-        $timestamp = (int) $parts['t'];
-        $now = time();
-
-        // Timestamp validation (replay protection window: 5 minutes).
-        if (abs($now - $timestamp) > 300) {
-            return false;
+        // Timestamped payload HMAC comparison: timestamp.rawBody
+        if ($timestamp !== null && $timestamp > 0) {
+            $expectedWithTs = hash_hmac('sha256', $timestamp . '.' . $rawBody, $this->webhookSecret);
+            if (hash_equals($expectedWithTs, $sig)) {
+                return true;
+            }
         }
 
-        $expected = hash_hmac('sha256', $timestamp . '.' . $rawBody, $this->webhookSecret);
-        return hash_equals($expected, $parts['v1']);
+        return false;
     }
 
     private function normalize(array $data): KycResult

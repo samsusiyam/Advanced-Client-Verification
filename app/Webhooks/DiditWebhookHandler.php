@@ -22,8 +22,18 @@ class DiditWebhookHandler
             $config['callback_url'] ?? cv_callback_url()
         );
 
-        $sigHeader = self::header($headers, 'Didit-Signature');
-        if (!$provider->verifyWebhook($rawBody, $sigHeader)) {
+        $sigHeader = self::header($headers, 'x-signature-v2')
+            ?: (self::header($headers, 'x-signature')
+            ?: (self::header($headers, 'x-signature-simple')
+            ?: (self::header($headers, 'didit-signature')
+            ?: (self::header($headers, 'http_x_signature_v2')
+            ?: (self::header($headers, 'http_x_signature')
+            ?: self::header($headers, 'http_didit_signature'))))));
+
+        $timestampHeader = (int) (self::header($headers, 'x-timestamp')
+            ?: self::header($headers, 'http_x_timestamp'));
+
+        if (!$provider->verifyWebhook($rawBody, $sigHeader, $timestampHeader)) {
             return ['success' => false, 'error' => 'invalid_signature'];
         }
 
@@ -34,6 +44,27 @@ class DiditWebhookHandler
 
         $sessionId = $payload['session_id'] ?? '';
         $eventId = $payload['event_id'] ?? ($payload['id'] ?? $sessionId);
+
+        // Check if this is a Didit test webhook
+        $isTest = (
+            self::header($headers, 'x-didit-test-webhook') === 'true'
+            || !empty($payload['metadata']['test_webhook'])
+            || ($payload['vendor_data'] ?? '') === 'test-vendor-data-123'
+        );
+
+        if ($isTest) {
+            Capsule::table('mod_cv_webhook_events')->insert([
+                'event_id' => $eventId ?: 'test_' . time(),
+                'session_id' => $sessionId ?: 'test_session',
+                'source' => 'didit',
+                'payload' => $rawBody,
+                'signature' => $sigHeader,
+                'processed' => 1,
+                'result' => 'test_webhook_verified',
+                'received_at' => date('Y-m-d H:i:s'),
+            ]);
+            return ['success' => true, 'error' => '', 'status' => 'test_webhook_verified'];
+        }
 
         // Idempotency / replay protection. Match both completed (1) and
         // in-flight (0) events so a concurrent duplicate is rejected before it
