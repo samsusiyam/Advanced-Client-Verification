@@ -4,6 +4,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 use ClientVerification\Security\Sanitizer;
 use ClientVerification\Security\Csrf;
 
+$successMsg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::check($_POST['cv_token'] ?? null)) {
     if (isset($_POST['add'])) {
         $pid = Sanitizer::int($_POST['product_id']);
@@ -13,40 +14,134 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && Csrf::check($_POST['cv_token'] ?? n
                 ['product_id' => $pid],
                 ['requirement' => $req, 'updated_at' => date('Y-m-d H:i:s')]
             );
-            echo '<div class="alert alert-success">Product rule saved.</div>';
+            $successMsg = 'Product verification rule saved successfully.';
         }
     }
     if (isset($_POST['delete_id'])) {
         Capsule::table('mod_cv_product_rules')->where('id', Sanitizer::int($_POST['delete_id']))->delete();
+        $successMsg = 'Product rule removed.';
     }
 }
 
-$rules = Capsule::table('mod_cv_product_rules')->get();
+$allProducts = [];
+try {
+    $allProducts = Capsule::table('tblproducts')
+        ->leftJoin('tblproductgroups', 'tblproducts.gid', '=', 'tblproductgroups.id')
+        ->select('tblproducts.id', 'tblproducts.name as pname', 'tblproductgroups.name as gname')
+        ->orderBy('tblproductgroups.name')
+        ->orderBy('tblproducts.name')
+        ->get();
+} catch (\Exception $e) {}
+
+$rules = Capsule::table('mod_cv_product_rules')
+    ->leftJoin('tblproducts', 'mod_cv_product_rules.product_id', '=', 'tblproducts.id')
+    ->leftJoin('tblproductgroups', 'tblproducts.gid', '=', 'tblproductgroups.id')
+    ->select('mod_cv_product_rules.*', 'tblproducts.name as pname', 'tblproductgroups.name as gname')
+    ->get();
+
+cv_admin_header('product-rules', 'Product Rules', 'Specify which WHMCS products require identity verification prior to checkout.');
+
 ?>
-<h2><?php echo Sanitizer::escape($_LANG['cv_product_rules']); ?></h2>
-<div style="background:#fff;border:1px solid #ddd;border-radius:6px;padding:16px;max-width:800px;">
-<form method="post">
-<?php echo Csrf::field(); ?>
-<input type="hidden" name="add" value="1">
-Product ID: <input type="text" name="product_id" class="form-control" style="width:120px;display:inline-block;">
-Requirement:
-<select name="requirement" class="form-control" style="width:160px;display:inline-block;">
-<option value="required">Required</option>
-<option value="optional">Optional</option>
-<option value="not_required">Not Required</option>
-</select>
-<button type="submit" class="btn btn-primary">Add</button>
-</form>
-<table class="table table-bordered" style="margin-top:16px;width:100%;">
-<thead><tr><th>Product</th><th>Requirement</th><th>Action</th></tr></thead><tbody>
-<?php foreach ($rules as $r):
-    $pname = Capsule::table('tblproducts')->where('id', $r->product_id)->value('name'); ?>
-<tr><td><?php echo Sanitizer::escape($pname ?? ('#' . $r->product_id)); ?></td>
-<td><?php echo Sanitizer::escape($r->requirement); ?></td>
-<td>
-<form method="post" style="display:inline;"><?php echo Csrf::field(); ?>
-<input type="hidden" name="delete_id" value="<?php echo Sanitizer::escape($r->id); ?>">
-<button class="btn btn-danger btn-sm">Delete</button></form></td></tr>
-<?php endforeach; ?>
-</tbody></table>
+
+<?php if ($successMsg): ?>
+    <div class="alert alert-success" style="border-radius: 6px; margin-bottom: 20px;">
+        <i class="fa fa-check-circle"></i> <?php echo htmlspecialchars($successMsg); ?>
+    </div>
+<?php endif; ?>
+
+<div class="row">
+    <div class="col-md-5">
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); padding: 20px; margin-bottom: 20px;">
+            <h4 style="margin: 0 0 16px 0; font-size: 15px; font-weight: 700; color: #1e293b; padding-bottom: 10px; border-bottom: 1px solid #f1f5f9;">
+                <i class="fa fa-plus-circle text-primary"></i> Add / Update Product Rule
+            </h4>
+
+            <form method="post">
+                <?php echo Csrf::field(); ?>
+                <input type="hidden" name="add" value="1">
+                
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #334155;">Select Product:</label>
+                    <select name="product_id" class="form-control" required style="width: 100%;">
+                        <option value="">-- Choose a Product --</option>
+                        <?php foreach ($allProducts as $p): ?>
+                            <option value="<?php echo (int) $p->id; ?>">
+                                <?php echo htmlspecialchars(($p->gname ? $p->gname . ' - ' : '') . $p->pname . ' (ID: ' . $p->id . ')'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 18px;">
+                    <label style="font-size: 13px; font-weight: 600; color: #334155;">KYC Verification Requirement:</label>
+                    <select name="requirement" class="form-control">
+                        <option value="required">Required (Block checkout if not verified)</option>
+                        <option value="optional">Optional (Allow checkout, prompt verification)</option>
+                        <option value="not_required">Not Required (Explicitly bypass KYC)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="font-weight: 600;">
+                    <i class="fa fa-save"></i> Save Product Rule
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; margin-bottom: 20px;">
+            <div style="padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #1e293b;">Configured Product Rules (<?php echo count($rules); ?>)</h4>
+            </div>
+
+            <div class="table-responsive" style="margin: 0;">
+                <table class="table table-hover" style="margin: 0;">
+                    <thead style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                        <tr>
+                            <th style="font-size: 12px; color: #64748b;">Product Name</th>
+                            <th style="font-size: 12px; color: #64748b;">Requirement</th>
+                            <th style="font-size: 12px; color: #64748b; text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if ($rules->isEmpty()): ?>
+                            <tr>
+                                <td colspan="3" style="text-align: center; padding: 30px; color: #94a3b8;">
+                                    No product-specific rules yet. Global module settings apply to all products.
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($rules as $r):
+                                $reqBadge = match($r->requirement) {
+                                    'required' => '<span class="label label-danger">Required</span>',
+                                    'optional' => '<span class="label label-info">Optional</span>',
+                                    default => '<span class="label label-default">Not Required</span>',
+                                };
+                            ?>
+                                <tr>
+                                    <td>
+                                        <strong><?php echo htmlspecialchars($r->pname ?? ('Product #' . $r->product_id)); ?></strong>
+                                        <?php if (!empty($r->gname)): ?>
+                                            <div style="font-size: 11px; color: #64748b;"><?php echo htmlspecialchars($r->gname); ?></div>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo $reqBadge; ?></td>
+                                    <td style="text-align: right;">
+                                        <form method="post" style="display: inline;" onsubmit="return confirm('Delete this product rule?');">
+                                            <?php echo Csrf::field(); ?>
+                                            <input type="hidden" name="delete_id" value="<?php echo (int) $r->id; ?>">
+                                            <button type="submit" class="btn btn-danger btn-xs" title="Remove rule">
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
+

@@ -117,8 +117,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($anyUploaded && $v) {
         Capsule::table('mod_cv_verifications')->where('id', $verificationId)->update(['status' => 'under_review', 'updated_at' => date('Y-m-d H:i:s')]);
         cv_log_audit($verificationId, 'documents_submitted', 0, '');
+        
+        echo '<div style="max-width: 600px; margin: 30px auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px 24px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">
+            <div style="width: 64px; height: 64px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 28px;">
+                <i class="fa fa-check"></i>
+            </div>
+            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #166534;">Documents Uploaded Successfully</h3>
+            <p style="color: #4b5563; font-size: 14px; margin-bottom: 24px;">Your files have been received securely and submitted for compliance verification.</p>
+            <a class="btn btn-primary" href="index.php?m=clientverification&action=verification&id=' . Sanitizer::escape($verificationId) . '" style="font-weight: 600; padding: 10px 24px;">
+                <i class="fa fa-arrow-left"></i> Return to Verification Status
+            </a>
+        </div>';
+        return;
+    } else {
+        echo '<div class="alert alert-warning" style="max-width: 600px; margin: 20px auto; border-radius: 8px;">No valid documents were selected for upload. <a href="index.php?m=clientverification&action=verification&id=' . Sanitizer::escape($verificationId) . '">Go Back</a></div>';
     }
-
-    echo '<div class="alert alert-success">Documents submitted for review.</div>';
-    echo '<a class="btn btn-default" href="index.php?m=clientverification&action=verification&id=' . Sanitizer::escape($verificationId) . '">Back</a>';
 }
+

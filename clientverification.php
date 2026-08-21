@@ -17,119 +17,7 @@ function clientverification_config()
         'version' => '1.0.0',
         'author' => 'Client Verification Team',
         'language' => 'english',
-        'fields' => [
-            'enabled' => [
-                'FriendlyName' => 'Module Enabled',
-                'Type' => 'yesno',
-                'Description' => 'Enable/disable the verification module',
-                'Default' => 'yes',
-            ],
-            'verification_mode' => [
-                'FriendlyName' => 'Verification Mode',
-                'Type' => 'dropdown',
-                'Options' => [
-                    'hybrid' => 'Hybrid (Recommended)',
-                    'manual' => 'Manual Only',
-                    'didit' => 'Didit Automated Only',
-                ],
-                'Default' => 'hybrid',
-                'Description' => 'Select the default verification mode',
-            ],
-            'didit_api_key' => [
-                'FriendlyName' => 'Didit API Key',
-                'Type' => 'password',
-                'Description' => 'Your Didit API key',
-            ],
-            'didit_workflow_id' => [
-                'FriendlyName' => 'Didit Workflow ID',
-                'Type' => 'text',
-                'Description' => 'Didit workflow identifier',
-            ],
-            'didit_webhook_secret' => [
-                'FriendlyName' => 'Didit Webhook Secret',
-                'Type' => 'password',
-                'Description' => 'Secret for verifying Didit webhooks',
-            ],
-            'didit_auto_approve' => [
-                'FriendlyName' => 'Auto Approve on Didit Success',
-                'Type' => 'yesno',
-                'Description' => 'Automatically approve when Didit returns approved status',
-                'Default' => 'yes',
-            ],
-            'didit_on_error' => [
-                'FriendlyName' => 'On Didit Provider Error',
-                'Type' => 'dropdown',
-                'Options' => [
-                    'manual_review' => 'Manual Review',
-                    'reject' => 'Reject',
-                ],
-                'Default' => 'manual_review',
-                'Description' => 'Action when Didit provider encounters an error',
-            ],
-            'storage_path' => [
-                'FriendlyName' => 'Document Storage Path',
-                'Type' => 'text',
-                'Description' => 'Absolute path for document storage (outside public_html)',
-                'Default' => '/home/{username}/kyc-storage',
-            ],
-            'storage_encryption' => [
-                'FriendlyName' => 'Enable Document Encryption',
-                'Type' => 'yesno',
-                'Description' => 'Encrypt stored documents at rest',
-                'Default' => 'no',
-            ],
-            'encryption_key' => [
-                'FriendlyName' => 'Encryption Key',
-                'Type' => 'password',
-                'Description' => 'Key for document encryption (32 chars recommended)',
-            ],
-            'max_file_size' => [
-                'FriendlyName' => 'Max File Size (MB)',
-                'Type' => 'text',
-                'Description' => 'Maximum upload file size in megabytes',
-                'Default' => '10',
-            ],
-            'allowed_extensions' => [
-                'FriendlyName' => 'Allowed File Extensions',
-                'Type' => 'text',
-                'Description' => 'Comma-separated allowed extensions',
-                'Default' => 'pdf,jpg,jpeg,png,webp',
-            ],
-            'verification_expiry_days' => [
-                'FriendlyName' => 'Verification Expiry (Days)',
-                'Type' => 'text',
-                'Description' => 'Number of days before verification expires',
-                'Default' => '365',
-            ],
-            'risk_threshold_approve' => [
-                'FriendlyName' => 'Auto-Approve Risk Threshold',
-                'Type' => 'text',
-                'Description' => 'Risk score below this value auto-approves (0-100)',
-                'Default' => '30',
-            ],
-            'risk_threshold_review' => [
-                'FriendlyName' => 'Manual Review Risk Threshold',
-                'Type' => 'text',
-                'Description' => 'Risk score below this value requires manual review (0-100)',
-                'Default' => '70',
-            ],
-            'rate_limit_attempts' => [
-                'FriendlyName' => 'Rate Limit: Max Attempts',
-                'Type' => 'text',
-                'Description' => 'Maximum verification attempts per hour',
-                'Default' => '5',
-            ],
-            'webhook_outbound_secret' => [
-                'FriendlyName' => 'Outbound Webhook Secret',
-                'Type' => 'password',
-                'Description' => 'Secret for signing outbound webhooks',
-            ],
-            'api_token' => [
-                'FriendlyName' => 'API Access Token',
-                'Type' => 'password',
-                'Description' => 'Token for API access',
-            ],
-        ],
+        'fields' => [],
     ];
 }
 
@@ -193,12 +81,6 @@ function clientverification_output($vars)
 {
     $action = $_GET['action'] ?? 'dashboard';
 
-    $adminId = (int) Capsule::table('tbladmins')->where('id', $_SESSION['adminid'])->value('id');
-    if (!$adminId) {
-        die('Unauthorized');
-    }
-
-    $templatesPath = __DIR__ . '/templates/admin/';
     $langFile = __DIR__ . '/lang/english.php';
     if (file_exists($langFile)) {
         require_once $langFile;
@@ -248,7 +130,7 @@ function clientverification_clientarea($vars)
 {
     $action = $_GET['action'] ?? 'index';
 
-    $clientId = (int) $_SESSION['clientsdetails']['userid'] ?? 0;
+    $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
     if (!$clientId) {
         header('Location: clientarea.php');
         exit;
@@ -281,16 +163,24 @@ function clientverification_clientarea($vars)
 function cv_insert_default_settings()
 {
     $defaults = [
+        'enabled' => 'yes',
         'verification_mode' => 'hybrid',
+        'didit_api_key' => '',
+        'didit_workflow_id' => '',
+        'didit_webhook_secret' => '',
         'didit_auto_approve' => '1',
         'didit_on_error' => 'manual_review',
+        'storage_path' => '',
+        'storage_encryption' => '0',
+        'encryption_key' => '',
         'max_file_size' => '10',
         'allowed_extensions' => 'pdf,jpg,jpeg,png,webp',
         'verification_expiry_days' => '365',
         'risk_threshold_approve' => '30',
         'risk_threshold_review' => '70',
         'rate_limit_attempts' => '5',
-        'storage_encryption' => '0',
+        'webhook_outbound_secret' => '',
+        'api_token' => '',
     ];
 
     foreach ($defaults as $key => $value) {

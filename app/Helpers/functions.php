@@ -320,3 +320,116 @@ if (!function_exists('cv_kyc_required_for_product')) {
         return $mode !== 'disabled';
     }
 }
+
+if (!function_exists('cv_admin_header')) {
+    /**
+     * Render unified, modern admin navigation header across all module pages.
+     */
+    function cv_admin_header(string $activeTab = 'dashboard', string $title = '', string $subtitle = ''): void
+    {
+        $pendingCount = 0;
+        try {
+            $pendingCount = Capsule::table('mod_cv_verifications')
+                ->whereIn('status', ['pending', 'under_review'])
+                ->count();
+        } catch (\Exception $e) {}
+
+        $navTabs = [
+            'dashboard' => ['label' => 'Dashboard', 'icon' => 'fa-tachometer'],
+            'verifications' => ['label' => 'Verifications', 'icon' => 'fa-id-card', 'badge' => $pendingCount],
+            'documents' => ['label' => 'Documents', 'icon' => 'fa-folder-open'],
+            'settings' => ['label' => 'Settings', 'icon' => 'fa-cogs'],
+            'product-rules' => ['label' => 'Product Rules', 'icon' => 'fa-cube'],
+            'group-rules' => ['label' => 'Group Rules', 'icon' => 'fa-users'],
+            'webhooks' => ['label' => 'Webhooks', 'icon' => 'fa-bolt'],
+            'api' => ['label' => 'API Tokens', 'icon' => 'fa-key'],
+            'audit-logs' => ['label' => 'Audit Logs', 'icon' => 'fa-history'],
+            'exports' => ['label' => 'Exports', 'icon' => 'fa-download'],
+        ];
+
+        echo '<div class="cv-admin-wrapper" style="margin-bottom: 22px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">';
+        
+        echo '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px;">';
+        echo '<div>';
+        echo '<h2 style="margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">';
+        echo '<span style="color: #2563eb;"><i class="fa fa-shield"></i></span> Advanced Client Verification';
+        if ($title) {
+            echo '<span style="color: #cbd5e1; font-weight: 300;"> / </span> <span style="font-size: 19px; font-weight: 600; color: #334155;">' . htmlspecialchars($title) . '</span>';
+        }
+        echo '</h2>';
+        if ($subtitle) {
+            echo '<p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">' . htmlspecialchars($subtitle) . '</p>';
+        }
+        echo '</div>';
+        
+        $mode = cv_setting('verification_mode', 'hybrid');
+        $enabled = cv_setting('enabled', 'yes') === 'yes';
+        $statusColor = $enabled ? '#10b981' : '#ef4444';
+        $statusText = $enabled ? 'Active' : 'Disabled';
+        
+        echo '<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #475569; background: #f8fafc; padding: 6px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">';
+        echo '<span>Status: <strong style="color: ' . $statusColor . ';">' . $statusText . '</strong></span>';
+        echo '<span style="color: #cbd5e1;">|</span>';
+        echo '<span>Mode: <strong style="text-transform: uppercase; color: #2563eb;">' . htmlspecialchars($mode) . '</strong></span>';
+        echo '<span style="color: #cbd5e1;">|</span>';
+        echo '<span>v1.0.0</span>';
+        echo '</div>';
+        echo '</div>';
+
+        echo '<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; background: #ffffff; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">';
+        foreach ($navTabs as $tab => $item) {
+            $isActive = ($activeTab === $tab);
+            $bg = $isActive ? '#2563eb' : '#f8fafc';
+            $color = $isActive ? '#ffffff' : '#334155';
+            $border = $isActive ? '#1d4ed8' : '#e2e8f0';
+            $weight = $isActive ? '600' : '500';
+            
+            echo '<a href="addonmodules.php?module=clientverification&action=' . urlencode($tab) . '" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: ' . $weight . '; background: ' . $bg . '; color: ' . $color . '; border: 1px solid ' . $border . '; transition: all 0.15s ease;">';
+            echo '<i class="fa ' . $item['icon'] . '"></i> ' . htmlspecialchars($item['label']);
+            if (!empty($item['badge']) && $item['badge'] > 0) {
+                $badgeBg = $isActive ? '#ffffff' : '#ef4444';
+                $badgeColor = $isActive ? '#dc2626' : '#ffffff';
+                echo ' <span style="background: ' . $badgeBg . '; color: ' . $badgeColor . '; font-size: 11px; padding: 1px 6px; border-radius: 10px; font-weight: 700; margin-left: 2px;">' . (int)$item['badge'] . '</span>';
+            }
+            echo '</a>';
+        }
+        echo '</div>';
+        echo '</div>';
+    }
+}
+
+if (!function_exists('cv_render_pagination')) {
+    /**
+     * Safe HTML pagination renderer for WHMCS (avoids Laravel view dependency issues).
+     */
+    function cv_render_pagination(int $total, int $perPage, int $currentPage, string $baseUrl): string
+    {
+        $totalPages = (int) ceil($total / $perPage);
+        if ($totalPages <= 1) {
+            return '';
+        }
+
+        $html = '<div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; padding-top: 14px; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px;">';
+        $from = (($currentPage - 1) * $perPage) + 1;
+        $to = min($total, $currentPage * $perPage);
+        $html .= '<div style="font-size: 13px; color: #64748b;">Showing <strong>' . $from . '</strong> to <strong>' . $to . '</strong> of <strong>' . $total . '</strong> entries</div>';
+        $html .= '<div style="display: flex; gap: 4px;">';
+
+        if ($currentPage > 1) {
+            $html .= '<a href="' . $baseUrl . '&page=' . ($currentPage - 1) . '" class="btn btn-default btn-sm">&laquo; Prev</a>';
+        }
+
+        for ($p = max(1, $currentPage - 2); $p <= min($totalPages, $currentPage + 2); $p++) {
+            $cls = ($p === $currentPage) ? 'btn-primary' : 'btn-default';
+            $html .= '<a href="' . $baseUrl . '&page=' . $p . '" class="btn ' . $cls . ' btn-sm">' . $p . '</a>';
+        }
+
+        if ($currentPage < $totalPages) {
+            $html .= '<a href="' . $baseUrl . '&page=' . ($currentPage + 1) . '" class="btn btn-default btn-sm">Next &raquo;</a>';
+        }
+
+        $html .= '</div></div>';
+        return $html;
+    }
+}
+
