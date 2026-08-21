@@ -143,7 +143,9 @@ $baseUrl = 'addonmodules.php?module=clientverification&action=verifications'
                             $statusBadge = match($row->status) {
                                 'approved' => '<span class="label label-success" style="font-size: 11px; padding: 4px 8px;">Approved</span>',
                                 'rejected' => '<span class="label label-danger" style="font-size: 11px; padding: 4px 8px;">Rejected</span>',
+                                'suspended' => '<span class="label label-danger" style="font-size: 11px; padding: 4px 8px; background: #991b1b;"><i class="fa fa-ban"></i> Suspended</span>',
                                 'under_review' => '<span class="label label-warning" style="font-size: 11px; padding: 4px 8px;">Under Review</span>',
+                                'info_requested' => '<span class="label label-info" style="font-size: 11px; padding: 4px 8px; background: #0284c7;">Info Requested</span>',
                                 'expired' => '<span class="label label-default" style="font-size: 11px; padding: 4px 8px;">Expired</span>',
                                 default => '<span class="label label-info" style="font-size: 11px; padding: 4px 8px;">Pending</span>',
                             };

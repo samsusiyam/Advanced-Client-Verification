@@ -44,11 +44,11 @@ class VerificationService
         }
 
         $data = ['status' => $status, 'updated_at' => date('Y-m-d H:i:s')];
-        if (in_array($status, ['approved', 'rejected'], true)) {
+        if (in_array($status, ['approved', 'rejected', 'suspended'], true)) {
             $data['reviewed_at'] = date('Y-m-d H:i:s');
             $data['reviewed_by'] = $adminId ? (string) $adminId : null;
         }
-        if ($status === 'rejected' && !empty($note)) {
+        if (in_array($status, ['rejected', 'suspended'], true) && !empty($note)) {
             try {
                 if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'rejection_reason')) {
                     Capsule::schema()->table('mod_cv_verifications', function ($table) {
@@ -67,10 +67,11 @@ class VerificationService
         Capsule::table('mod_cv_verifications')->where('id', $verificationId)->update($data);
 
         // Keep associated documents in sync with the verification decision.
-        if (in_array($status, ['approved', 'rejected'], true)) {
+        if (in_array($status, ['approved', 'rejected', 'suspended'], true)) {
+            $docStatus = ($status === 'suspended') ? 'rejected' : $status;
             Capsule::table('mod_cv_documents')
                 ->where('verification_id', $verificationId)
-                ->update(['status' => $status, 'updated_at' => date('Y-m-d H:i:s')]);
+                ->update(['status' => $docStatus, 'updated_at' => date('Y-m-d H:i:s')]);
         }
 
         if (function_exists('cv_log_audit')) {
@@ -83,8 +84,11 @@ class VerificationService
                 Notifier::approved($row->client_id);
                 OutboundWebhook::dispatch('verification.approved', $verificationId);
             } elseif ($status === 'rejected') {
-                Notifier::rejected($row->client_id);
+                Notifier::rejected($row->client_id, ['reason' => $note, 'note' => $note]);
                 OutboundWebhook::dispatch('verification.rejected', $verificationId);
+            } elseif ($status === 'suspended') {
+                Notifier::suspended($row->client_id, ['reason' => $note ?: 'Account verification suspended by compliance administration.', 'note' => $note]);
+                OutboundWebhook::dispatch('verification.suspended', $verificationId);
             } elseif ($status === 'under_review') {
                 Notifier::reviewRequired($row->client_id);
                 OutboundWebhook::dispatch('verification.review_required', $verificationId);

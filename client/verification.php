@@ -16,6 +16,7 @@ if (!$v) {
 $statusBadge = match($v->status) {
     'approved' => '<span class="label label-success" style="font-size: 12px; padding: 4px 10px;">Approved</span>',
     'rejected' => '<span class="label label-danger" style="font-size: 12px; padding: 4px 10px;">Rejected</span>',
+    'suspended' => '<span class="label label-danger" style="font-size: 12px; padding: 4px 10px; background: #991b1b;"><i class="fa fa-ban"></i> Suspended</span>',
     'under_review' => '<span class="label label-warning" style="font-size: 12px; padding: 4px 10px;">Under Review</span>',
     'info_requested' => '<span class="label label-info" style="font-size: 12px; padding: 4px 10px; background: #0284c7;">Info Requested</span>',
     'expired' => '<span class="label label-default" style="font-size: 12px; padding: 4px 10px;">Expired</span>',
@@ -57,6 +58,41 @@ if ($types->isEmpty()) {
                 <div class="alert alert-success" style="border-radius: 8px; margin: 0; display: flex; align-items: center; gap: 10px;">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     <span>Your identity documents have been approved. No further action is required.</span>
+                </div>
+            <?php elseif ($v->status === 'suspended'): 
+                $suspendReason = $v->rejection_reason ?? '';
+                if (empty($suspendReason)) {
+                    try {
+                        $lastSuspendLog = Capsule::table('mod_cv_audit_logs')
+                            ->where('verification_id', $id)
+                            ->whereIn('action', ['suspended', 'status_suspended'])
+                            ->orderByDesc('id')
+                            ->first();
+                        if ($lastSuspendLog && !empty($lastSuspendLog->details)) {
+                            $suspendReason = $lastSuspendLog->details;
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            ?>
+                <div style="text-align: center; padding: 10px 10px 20px 10px;">
+                    <div style="width: 72px; height: 72px; background: #fee2e2; color: #991b1b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 18px auto;">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#991b1b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+                    </div>
+                    <h3 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 700; color: #991b1b;">Identity Verification Suspended</h3>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 24px;">Your identity verification has been suspended by compliance administration.</p>
+
+                    <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px 20px; margin-bottom: 28px; text-align: left; max-width: 580px; margin-left: auto; margin-right: auto;">
+                        <div style="font-size: 13px; font-weight: 700; color: #991b1b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                            <i class="fa fa-ban"></i> Reason for Suspension:
+                        </div>
+                        <div style="font-size: 14px; color: #7f1d1d; line-height: 1.5;">
+                            <?php echo htmlspecialchars($suspendReason ?: 'Account verification was suspended due to compliance review policy. Please contact support.'); ?>
+                        </div>
+                    </div>
+
+                    <a href="submitticket.php" class="btn btn-danger btn-lg" style="font-weight: 700; padding: 12px 36px; border-radius: 6px;">
+                        <i class="fa fa-life-ring"></i> Contact Compliance Support &raquo;
+                    </a>
                 </div>
             <?php elseif ($v->status === 'rejected'): 
                 $rejectionReason = $v->rejection_reason ?? '';

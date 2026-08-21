@@ -71,6 +71,42 @@ if ($status === 'under_review' && !$hasUploadedDocs) {
                 <i class="fa fa-upload"></i> Upload Requested Information &raquo;
             </a>
 
+        <?php elseif ($status === 'suspended'): 
+            $suspendReason = $verification->rejection_reason ?? '';
+            if (empty($suspendReason)) {
+                try {
+                    $lastSuspendLog = Capsule::table('mod_cv_audit_logs')
+                        ->where('verification_id', $verification->id)
+                        ->whereIn('action', ['suspended', 'status_suspended'])
+                        ->orderByDesc('id')
+                        ->first();
+                    if ($lastSuspendLog && !empty($lastSuspendLog->details)) {
+                        $suspendReason = $lastSuspendLog->details;
+                    }
+                } catch (\Throwable $e) {}
+            }
+        ?>
+            <div style="width: 72px; height: 72px; background: #fee2e2; color: #991b1b; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto;">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#991b1b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+            </div>
+            <h3 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #991b1b;">Identity Verification Suspended</h3>
+            <p style="color: #4b5563; font-size: 14px; margin-bottom: 20px;">Your identity verification has been suspended by our compliance administration.</p>
+
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; text-align: left; max-width: 520px; margin-left: auto; margin-right: auto;">
+                <div style="font-size: 12px; font-weight: 700; color: #991b1b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa fa-ban"></i> Reason for Suspension:
+                </div>
+                <div style="font-size: 13px; color: #7f1d1d; line-height: 1.4;">
+                    <?php echo htmlspecialchars($suspendReason ?: 'Account verification was suspended due to compliance review policy. Please contact support.'); ?>
+                </div>
+            </div>
+
+            <div>
+                <a href="submitticket.php" class="btn btn-danger" style="font-weight: 600; padding: 10px 24px; border-radius: 6px;">
+                    <i class="fa fa-life-ring"></i> Contact Compliance Support &raquo;
+                </a>
+            </div>
+
         <?php elseif ($status === 'rejected'): 
             $rejectionReason = $verification->rejection_reason ?? '';
             if (empty($rejectionReason)) {
