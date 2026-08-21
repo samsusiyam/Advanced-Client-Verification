@@ -28,12 +28,22 @@ class HybridVerificationService
     {
         $method = ($mode === 'didit') ? 'didit' : (($mode === 'manual') ? 'manual' : 'hybrid');
 
-        // Check if there is an existing uncompleted session for this client to reuse
-        $existing = Capsule::table('mod_cv_verifications')
+        // Look for an existing uncompleted / in-progress session for this client to reuse
+        // An uncompleted session is any session not approved/rejected that has no uploaded files yet
+        $candidates = Capsule::table('mod_cv_verifications')
             ->where('client_id', $clientId)
-            ->whereIn('status', ['pending', 'in_progress'])
+            ->whereNotIn('status', ['approved', 'rejected'])
             ->orderByDesc('id')
-            ->first();
+            ->get();
+
+        $existing = null;
+        foreach ($candidates as $cand) {
+            $hasDocs = Capsule::table('mod_cv_documents')->where('verification_id', $cand->id)->exists();
+            if (!$hasDocs && !in_array($cand->didit_status, ['Approved', 'Declined', 'Expired'])) {
+                $existing = $cand;
+                break;
+            }
+        }
 
         if ($existing) {
             $verificationId = (int) $existing->id;
@@ -45,6 +55,26 @@ class HybridVerificationService
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
             $clientRef = $existing->client_ref ?: VerificationService::generateReference($verificationId, $clientId);
+
+            // Clean up any other empty unsubmitted duplicate sessions for this client
+            try {
+                $duplicateEmptyIds = Capsule::table('mod_cv_verifications')
+                    ->where('client_id', $clientId)
+                    ->where('id', '!=', $verificationId)
+                    ->whereNotIn('status', ['approved', 'rejected'])
+                    ->whereNotExists(function ($q) {
+                        $q->select(Capsule::raw(1))
+                          ->from('mod_cv_documents')
+                          ->whereRaw('mod_cv_documents.verification_id = mod_cv_verifications.id');
+                    })
+                    ->pluck('id')
+                    ->toArray();
+
+                if (!empty($duplicateEmptyIds)) {
+                    Capsule::table('mod_cv_verifications')->whereIn('id', $duplicateEmptyIds)->delete();
+                    Capsule::table('mod_cv_personal_data')->whereIn('verification_id', $duplicateEmptyIds)->delete();
+                }
+            } catch (\Throwable $e) {}
         } else {
             $verificationId = Capsule::table('mod_cv_verifications')->insertGetId([
                 'client_id' => $clientId,

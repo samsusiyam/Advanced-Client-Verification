@@ -72,21 +72,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $docType = Sanitizer::alphanumeric($_POST['document_type'] ?? 'national_id');
     $docNumber = Sanitizer::text($_POST['document_number'] ?? '');
 
-    // Save document number in personal data or audit log
+    // Save document number in personal data and verifications table
     if (!empty($docNumber)) {
         try {
+            if (!Capsule::schema()->hasColumn('mod_cv_personal_data', 'document_number')) {
+                Capsule::schema()->table('mod_cv_personal_data', function ($table) {
+                    $table->string('document_number', 100)->nullable()->after('verification_id');
+                });
+            }
+            if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'document_number')) {
+                Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                    $table->string('document_number', 100)->nullable()->after('client_ref');
+                });
+            }
+
+            Capsule::table('mod_cv_verifications')->where('id', $verificationId)->update([
+                'document_number' => $docNumber,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
             $hasPersonal = Capsule::table('mod_cv_personal_data')->where('verification_id', $verificationId)->exists();
             if ($hasPersonal) {
-                // If column doesn't exist, ignore exception
-                if (Capsule::schema()->hasColumn('mod_cv_personal_data', 'document_number')) {
-                    Capsule::table('mod_cv_personal_data')->where('verification_id', $verificationId)->update([
-                        'document_number' => $docNumber,
-                        'updated_at' => date('Y-m-d H:i:s'),
-                    ]);
-                }
+                Capsule::table('mod_cv_personal_data')->where('verification_id', $verificationId)->update([
+                    'document_number' => $docNumber,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            } else {
+                Capsule::table('mod_cv_personal_data')->insert([
+                    'verification_id' => $verificationId,
+                    'document_number' => $docNumber,
+                    'created_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
             }
         } catch (\Throwable $e) {}
-        cv_log_audit($verificationId, 'document_number_saved', 0, 'number=' . substr($docNumber, 0, 4) . '****');
+        cv_log_audit($verificationId, 'document_number_saved', 0, 'Document No: ' . $docNumber);
     }
 
     $uploadQueue = [];

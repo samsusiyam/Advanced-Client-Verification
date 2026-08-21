@@ -43,5 +43,10 @@ function migration_001_create_verifications_table()
                 $table->string('didit_decision', 50)->nullable();
             });
         }
+        if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'document_number')) {
+            Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                $table->string('document_number', 100)->nullable()->after('client_ref');
+            });
+        }
     }
 }

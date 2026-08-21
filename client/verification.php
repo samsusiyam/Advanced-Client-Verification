@@ -539,11 +539,24 @@ if ($types->isEmpty()) {
                 </script>
             <?php endif; ?>
 
-            <?php if (!$docs->isEmpty() && in_array($v->status, ['under_review', 'approved'])): ?>
+            <?php if (!$docs->isEmpty() && in_array($v->status, ['under_review', 'approved'])): 
+                $clientDocNum = $v->document_number ?? '';
+                if (empty($clientDocNum)) {
+                    $pData = Capsule::table('mod_cv_personal_data')->where('verification_id', $id)->first();
+                    $clientDocNum = $pData->document_number ?? '';
+                }
+            ?>
                 <div style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
-                    <h4 style="margin: 0 0 14px 0; font-size: 15px; font-weight: 700; color: #1e293b;">
-                        <i class="fa fa-folder-open text-primary"></i> Uploaded Documents (<?php echo count($docs); ?>)
-                    </h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                        <h4 style="margin: 0; font-size: 15px; font-weight: 700; color: #1e293b;">
+                            <i class="fa fa-folder-open text-primary"></i> Uploaded Documents (<?php echo count($docs); ?>)
+                        </h4>
+                        <?php if (!empty($clientDocNum)): ?>
+                            <span style="background: #e0f2fe; color: #0369a1; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+                                <i class="fa fa-id-card-o"></i> Document No: <?php echo htmlspecialchars($clientDocNum); ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <?php foreach ($docs as $d): 
                             $docBadge = match($d->status) {

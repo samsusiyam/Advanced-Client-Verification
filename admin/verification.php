@@ -179,6 +179,31 @@ $audit = json_decode($row->audit_log ?? '[]', true);
                     <td style="color: #64748b;">Method:</td>
                     <td><strong style="text-transform: capitalize;"><?php echo htmlspecialchars($row->verification_method); ?></strong></td>
                 </tr>
+                <?php 
+                $docNumber = $row->document_number ?? ($personal->document_number ?? '');
+                if (empty($docNumber)) {
+                    try {
+                        $docLog = Capsule::table('mod_cv_audit_logs')
+                            ->where('verification_id', $id)
+                            ->where('action', 'document_number_saved')
+                            ->orderByDesc('id')
+                            ->first();
+                        if ($docLog && !empty($docLog->details)) {
+                            if (preg_match('/Document No:\s*(.+)/i', $docLog->details, $m)) {
+                                $docNumber = trim($m[1]);
+                            } elseif (preg_match('/number=([^\s\*]+)/i', $docLog->details, $m)) {
+                                $docNumber = trim($m[1]);
+                            }
+                        }
+                    } catch (\Throwable $e) {}
+                }
+                ?>
+                <?php if (!empty($docNumber)): ?>
+                    <tr>
+                        <td style="color: #64748b;">Document / ID No:</td>
+                        <td><strong style="color: #0369a1; font-size: 14px; letter-spacing: 0.5px; background: #e0f2fe; padding: 2px 8px; border-radius: 4px; display: inline-block;"><?php echo htmlspecialchars($docNumber); ?></strong></td>
+                    </tr>
+                <?php endif; ?>
                 <tr>
                     <td style="color: #64748b;">Reference:</td>
                     <td><code><?php echo htmlspecialchars($row->client_ref ?: 'CV-' . $row->id); ?></code></td>

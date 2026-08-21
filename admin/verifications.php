@@ -167,6 +167,11 @@ $baseUrl = 'addonmodules.php?module=clientverification&action=verifications'
                                 <td style="vertical-align: middle;">
                                     <strong><a href="clientssummary.php?userid=<?php echo (int) $row->client_id; ?>" target="_blank"><?php echo htmlspecialchars(trim(($row->firstname ?? '') . ' ' . ($row->lastname ?? '')) ?: 'Client #' . $row->client_id); ?></a></strong>
                                     <div style="font-size: 11px; color: #64748b;"><?php echo htmlspecialchars($row->email ?? ''); ?></div>
+                                    <?php if (!empty($row->document_number)): ?>
+                                        <div style="font-size: 11px; color: #0284c7; font-weight: 600; margin-top: 2px;">
+                                            <i class="fa fa-id-card-o"></i> Doc #: <?php echo htmlspecialchars($row->document_number); ?>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
                                 <td style="vertical-align: middle;">
                                     <span style="text-transform: capitalize; background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">

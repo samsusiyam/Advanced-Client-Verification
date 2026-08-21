@@ -81,6 +81,25 @@ function clientverification_output($vars)
 {
     $action = $_GET['action'] ?? 'dashboard';
 
+    // Ensure database columns are up-to-date
+    try {
+        if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'document_number')) {
+            Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                $table->string('document_number', 100)->nullable()->after('client_ref');
+            });
+        }
+        if (!Capsule::schema()->hasColumn('mod_cv_personal_data', 'document_number')) {
+            Capsule::schema()->table('mod_cv_personal_data', function ($table) {
+                $table->string('document_number', 100)->nullable()->after('verification_id');
+            });
+        }
+        if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'info_request_note')) {
+            Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                $table->text('info_request_note')->nullable();
+            });
+        }
+    } catch (\Throwable $e) {}
+
     $langFile = __DIR__ . '/lang/english.php';
     if (file_exists($langFile)) {
         require_once $langFile;

@@ -212,6 +212,11 @@ $baseUrl = 'addonmodules.php?module=clientverification&action=documents'
                     <span class="badge" style="background: #e2e8f0; color: #334155; font-size: 11px; font-weight: 600;">
                         <?php echo count($docsForThis); ?> File<?php echo count($docsForThis) !== 1 ? 's' : ''; ?>
                     </span>
+                    <?php if (!empty($v->document_number)): ?>
+                        <span style="background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                            <i class="fa fa-id-card-o"></i> Doc #: <?php echo htmlspecialchars($v->document_number); ?>
+                        </span>
+                    <?php endif; ?>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 10px;" onclick="event.stopPropagation();">
