@@ -101,50 +101,50 @@ if ($types->isEmpty()) {
 
                     <!-- Document Front Side -->
                     <div class="form-group" style="margin-bottom: 22px;">
-                        <label style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                        <div style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                             <i class="fa fa-picture-o" style="color: #64748b;"></i> Document Front Side <span style="color: #ef4444;">*</span>
-                        </label>
-                        <input type="file" name="doc_front" id="file_front" accept="image/*,.pdf" required style="position: absolute; opacity: 0; width: 1px; height: 1px;">
-                        <div class="cv-dropzone" id="dropzone_front">
+                        </div>
+                        <input type="file" name="doc_front" id="file_front" accept="image/*,.pdf" required style="position: absolute; left: -9999px; opacity: 0;">
+                        <label for="file_front" class="cv-dropzone" id="dropzone_front">
                             <div class="cv-dz-placeholder" id="placeholder_front">
                                 <div class="cv-dz-icon"><i class="fa fa-camera"></i></div>
                                 <div class="cv-dz-title">Click to upload front side</div>
                                 <div class="cv-dz-subtitle">Max 5MB | JPG, PNG, WEBP, PDF</div>
                             </div>
                             <div class="cv-dz-preview" id="preview_front" style="display: none;"></div>
-                        </div>
+                        </label>
                     </div>
 
                     <!-- Document Back Side (Dynamic) -->
                     <div class="form-group" id="group_back" style="margin-bottom: 22px;">
-                        <label style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                        <div style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                             <i class="fa fa-picture-o" style="color: #64748b;"></i> Document Back Side <span style="color: #ef4444;">*</span>
-                        </label>
-                        <input type="file" name="doc_back" id="file_back" accept="image/*,.pdf" style="position: absolute; opacity: 0; width: 1px; height: 1px;">
-                        <div class="cv-dropzone" id="dropzone_back">
+                        </div>
+                        <input type="file" name="doc_back" id="file_back" accept="image/*,.pdf" style="position: absolute; left: -9999px; opacity: 0;">
+                        <label for="file_back" class="cv-dropzone" id="dropzone_back">
                             <div class="cv-dz-placeholder" id="placeholder_back">
                                 <div class="cv-dz-icon"><i class="fa fa-camera"></i></div>
                                 <div class="cv-dz-title">Click to upload back side</div>
                                 <div class="cv-dz-subtitle">Max 5MB | JPG, PNG, WEBP, PDF</div>
                             </div>
                             <div class="cv-dz-preview" id="preview_back" style="display: none;"></div>
-                        </div>
+                        </label>
                     </div>
 
                     <!-- Selfie Photo -->
                     <div class="form-group" style="margin-bottom: 28px;">
-                        <label style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+                        <div style="font-size: 13px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
                             <i class="fa fa-user" style="color: #64748b;"></i> Selfie Photo <span style="color: #ef4444;">*</span>
-                        </label>
-                        <input type="file" name="doc_selfie" id="file_selfie" accept="image/*,.pdf" required style="position: absolute; opacity: 0; width: 1px; height: 1px;">
-                        <div class="cv-dropzone" id="dropzone_selfie">
+                        </div>
+                        <input type="file" name="doc_selfie" id="file_selfie" accept="image/*,.pdf" required style="position: absolute; left: -9999px; opacity: 0;">
+                        <label for="file_selfie" class="cv-dropzone" id="dropzone_selfie">
                             <div class="cv-dz-placeholder" id="placeholder_selfie">
                                 <div class="cv-dz-icon"><i class="fa fa-user-circle"></i></div>
                                 <div class="cv-dz-title">Click to upload your selfie</div>
                                 <div class="cv-dz-subtitle">Clear photo of your face | Max 5MB</div>
                             </div>
                             <div class="cv-dz-preview" id="preview_selfie" style="display: none;"></div>
-                        </div>
+                        </label>
                     </div>
 
                     <!-- Submit Button -->
@@ -171,6 +171,9 @@ if ($types->isEmpty()) {
                         cursor: pointer;
                         transition: all 0.2s ease-in-out;
                         position: relative;
+                        display: block;
+                        width: 100%;
+                        margin: 0;
                         user-select: none;
                     }
                     .cv-dropzone:hover {
@@ -181,16 +184,19 @@ if ($types->isEmpty()) {
                         font-size: 36px;
                         color: #2563eb;
                         margin-bottom: 8px;
+                        pointer-events: none;
                     }
                     .cv-dz-title {
                         font-size: 14px;
                         font-weight: 600;
                         color: #1e293b;
                         margin-bottom: 4px;
+                        pointer-events: none;
                     }
                     .cv-dz-subtitle {
                         font-size: 12px;
                         color: #64748b;
+                        pointer-events: none;
                     }
                     .cv-preview-img {
                         max-height: 160px;
@@ -254,11 +260,6 @@ if ($types->isEmpty()) {
                         var preview = document.getElementById('preview_' + key);
 
                         if (!fileInput || !dropzone) return;
-
-                        // Clicking anywhere on dropzone opens file dialog
-                        dropzone.addEventListener('click', function(e) {
-                            fileInput.click();
-                        });
 
                         fileInput.addEventListener('change', function(e) {
                             if (fileInput.files && fileInput.files[0]) {

@@ -17,12 +17,16 @@ class ProviderFactory
         switch ($method) {
             case 'didit':
             case 'hybrid':
+                $baseUrl = $config['didit_base_url'] ?? ($config['base_url'] ?? 'https://verification.didit.me');
+                if (empty($baseUrl) || strpos($baseUrl, 'apikyc.didit.me') !== false) {
+                    $baseUrl = 'https://verification.didit.me';
+                }
                 return new DiditProvider(
                     $config['didit_api_key'] ?? ($config['api_key'] ?? ''),
                     $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? ''),
                     $config['didit_webhook_secret'] ?? ($config['webhook_secret'] ?? ''),
                     $config['callback_url'] ?? '',
-                    $config['base_url'] ?? 'https://apikyc.didit.me'
+                    $baseUrl
                 );
             case 'manual':
             default:

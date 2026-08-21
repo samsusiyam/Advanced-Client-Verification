@@ -25,11 +25,15 @@ class DiditProvider implements KycProviderInterface
         string $callbackUrl = '',
         string $baseUrl = 'https://verification.didit.me'
     ) {
-        $this->apiKey = $apiKey;
-        $this->workflowId = $workflowId;
-        $this->webhookSecret = $webhookSecret;
-        $this->baseUrl = rtrim($baseUrl, '/');
-        $this->callbackUrl = $callbackUrl;
+        $this->apiKey = trim($apiKey);
+        $this->workflowId = trim($workflowId);
+        $this->webhookSecret = trim($webhookSecret);
+        $cleanedBase = rtrim(trim($baseUrl), '/');
+        if (empty($cleanedBase) || strpos($cleanedBase, 'apikyc.didit.me') !== false) {
+            $cleanedBase = 'https://verification.didit.me';
+        }
+        $this->baseUrl = $cleanedBase;
+        $this->callbackUrl = trim($callbackUrl);
     }
 
     public function getName(): string
@@ -42,8 +46,12 @@ class DiditProvider implements KycProviderInterface
         $payload = [
             'workflow_id' => $this->workflowId,
             'vendor_data' => $verification->clientReference,
-            'callback' => $this->callbackUrl,
         ];
+
+        if (!empty($this->callbackUrl)) {
+            $payload['callback'] = $this->callbackUrl;
+            $payload['callback_url'] = $this->callbackUrl;
+        }
 
         $headers = [
             'x-api-key: ' . $this->apiKey,
@@ -52,28 +60,32 @@ class DiditProvider implements KycProviderInterface
             'Accept: application/json',
         ];
 
-        $response = Http::post(
-            $this->baseUrl . '/v3/session/',
-            $payload,
-            $headers
-        );
+        $targetUrl = $this->baseUrl . '/v3/session/';
+        $response = Http::post($targetUrl, $payload, $headers);
 
         if (!$response['success'] && ($response['http_code'] === 404 || strpos($response['error'], '404') !== false)) {
-            $response = Http::post(
-                $this->baseUrl . '/v2/session',
-                $payload,
-                $headers
-            );
+            $targetUrl = $this->baseUrl . '/v2/session';
+            $response = Http::post($targetUrl, $payload, $headers);
         }
 
         if (!$response['success']) {
-            $errDetail = $response['error'];
-            if (!empty($response['data']['message'])) {
-                $errDetail .= ' (' . $response['data']['message'] . ')';
-            } elseif (!empty($response['data']['detail'])) {
-                $errDetail .= ' (' . $response['data']['detail'] . ')';
+            $errDetail = $response['error'] ?: 'HTTP ' . $response['http_code'];
+            $resData = is_array($response['data']) ? $response['data'] : [];
+            if (!empty($resData['message'])) {
+                $errDetail .= ' - ' . (is_array($resData['message']) ? json_encode($resData['message']) : $resData['message']);
+            } elseif (!empty($resData['detail'])) {
+                $errDetail .= ' - ' . (is_array($resData['detail']) ? json_encode($resData['detail']) : $resData['detail']);
+            } elseif (!empty($resData['error'])) {
+                $errDetail .= ' - ' . (is_array($resData['error']) ? json_encode($resData['error']) : $resData['error']);
             }
-            throw new \RuntimeException('Didit session creation failed: ' . $errDetail);
+
+            $diag = sprintf(
+                '[Endpoint: %s | HTTP: %d | Error: %s]',
+                $targetUrl,
+                $response['http_code'],
+                $errDetail
+            );
+            throw new \RuntimeException('Didit session creation failed: ' . $diag);
         }
 
         $data = $response['data'];
@@ -81,7 +93,7 @@ class DiditProvider implements KycProviderInterface
         $url = $data['url'] ?? ($data['session_url'] ?? ($data['sessionUrl'] ?? ($data['url_token'] ?? '')));
 
         if (!$sessionId && !$url) {
-            throw new \RuntimeException('Didit session creation failed: missing session response data');
+            throw new \RuntimeException('Didit session creation failed: missing session response data [URL/SessionID empty]');
         }
 
         return new KycSession($sessionId ?: 'didit_' . time(), $url, $data);

@@ -60,6 +60,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cv_save_settings'])) 
     }
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cv_test_didit'])) {
+    if (!Csrf::check($_POST['cv_token'] ?? null)) {
+        $errorMessage = 'Security token expired or invalid. Please try again.';
+    } else {
+        $testApiKey = trim($_POST['didit_api_key'] ?? cv_setting('didit_api_key', ''));
+        $testWf = trim($_POST['didit_workflow_id'] ?? cv_setting('didit_workflow_id', ''));
+        $activeTab = 'didit';
+        
+        if (empty($testApiKey) || empty($testWf)) {
+            $errorMessage = 'Please provide both Didit API Key and Workflow ID to test connection.';
+        } else {
+            $headers = [
+                'x-api-key: ' . $testApiKey,
+                'Authorization: Bearer ' . $testApiKey,
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ];
+            $payload = [
+                'workflow_id' => $testWf,
+                'vendor_data' => 'test-probe-' . time(),
+            ];
+            $testRes = \ClientVerification\Helpers\Http::post('https://verification.didit.me/v3/session/', $payload, $headers);
+            if (!$testRes['success'] && ($testRes['http_code'] === 404 || strpos($testRes['error'], '404') !== false)) {
+                $testRes = \ClientVerification\Helpers\Http::post('https://verification.didit.me/v2/session', $payload, $headers);
+            }
+            
+            if ($testRes['success']) {
+                $url = $testRes['data']['url'] ?? ($testRes['data']['session_url'] ?? 'Session Created');
+                $successMessage = '✅ Didit API Connection Successful! (HTTP ' . $testRes['http_code'] . ') Endpoint is reachable and valid. URL: ' . $url;
+            } else {
+                $detail = $testRes['error'] ?: 'HTTP ' . $testRes['http_code'];
+                $resData = is_array($testRes['data']) ? $testRes['data'] : [];
+                if (!empty($resData['message'])) {
+                    $detail .= ' - ' . (is_array($resData['message']) ? json_encode($resData['message']) : $resData['message']);
+                } elseif (!empty($resData['detail'])) {
+                    $detail .= ' - ' . (is_array($resData['detail']) ? json_encode($resData['detail']) : $resData['detail']);
+                }
+                $errorMessage = '❌ Didit API Connection Test Failed (HTTP ' . $testRes['http_code'] . '): ' . $detail;
+            }
+        }
+    }
+}
+
 $activeTab = $_GET['tab'] ?? ($_POST['active_tab'] ?? 'general');
 if (!in_array($activeTab, ['general', 'didit', 'storage', 'risk'], true)) {
     $activeTab = 'general';
@@ -312,12 +355,22 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
                 </div>
             </div>
 
-            <div class="cv-field">
+            <div class="cv-field" style="margin-bottom: 20px;">
                 <label style="font-size: 14px; font-weight: 600; cursor: pointer;">
                     <input type="checkbox" name="didit_auto_approve" value="1" <?php echo in_array(cv_setting('didit_auto_approve', '1'), ['1', 'yes', 'on'], true) ? 'checked' : ''; ?>>
                     Auto-Approve Client on Didit KYC Success
                 </label>
                 <div class="cv-field-hint">Automatically approves client verification when Didit passes and risk score is low.</div>
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <strong style="color: #1e293b; font-size: 13px;"><i class="fa fa-plug text-primary"></i> Test Didit Credentials</strong>
+                    <div style="font-size: 12px; color: #64748b;">Verify API Key and Workflow ID against Didit Production endpoint.</div>
+                </div>
+                <button type="submit" name="cv_test_didit" value="1" class="btn btn-default btn-sm" style="font-weight: 600;">
+                    <i class="fa fa-refresh"></i> Test Didit API Connection
+                </button>
             </div>
         </div>
 
