@@ -1,3 +1,10 @@
+<?php
+
+use Illuminate\Database\Capsule\Manager as Capsule;
+use ClientVerification\Security\Sanitizer;
+use ClientVerification\Security\Csrf;
+use ClientVerification\Services\VerificationService;
+
 $successMessage = '';
 if (!empty($_GET['deleted'])) {
     $successMessage = 'Verification record and its files have been permanently deleted.';
@@ -124,7 +131,7 @@ $baseUrl = 'addonmodules.php?module=clientverification&action=verifications'
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($rows->isEmpty()): ?>
+                    <?php if (empty($rows) || $rows->isEmpty()): ?>
                         <tr>
                             <td colspan="8" style="text-align: center; padding: 40px; color: #94a3b8;">
                                 <i class="fa fa-search fa-2x" style="margin-bottom: 10px; display: block;"></i>
@@ -191,7 +198,7 @@ $baseUrl = 'addonmodules.php?module=clientverification&action=verifications'
             </table>
         </div>
 
-        <?php if (!$rows->isEmpty()): ?>
+        <?php if (!empty($rows) && !$rows->isEmpty()): ?>
             <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <button type="submit" name="cv_bulk_delete" value="1" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to permanently delete ALL selected verifications and their files?');">

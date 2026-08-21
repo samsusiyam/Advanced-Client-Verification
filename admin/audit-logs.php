@@ -1,3 +1,9 @@
+<?php
+
+use Illuminate\Database\Capsule\Manager as Capsule;
+use ClientVerification\Security\Sanitizer;
+use ClientVerification\Security\Csrf;
+
 $feedbackMessage = '';
 $feedbackType = 'success';
 
@@ -115,7 +121,7 @@ $baseUrl = 'addonmodules.php?module=clientverification&action=audit-logs'
                 </tr>
             </thead>
             <tbody>
-                <?php if ($rows->isEmpty()): ?>
+                <?php if (empty($rows) || $rows->isEmpty()): ?>
                     <tr>
                         <td colspan="7" style="text-align: center; padding: 40px; color: #94a3b8;">
                             <i class="fa fa-history fa-2x" style="margin-bottom: 8px; display: block;"></i>
