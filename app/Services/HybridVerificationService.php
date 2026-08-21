@@ -28,27 +28,46 @@ class HybridVerificationService
     {
         $method = ($mode === 'didit') ? 'didit' : (($mode === 'manual') ? 'manual' : 'hybrid');
 
-        $verificationId = Capsule::table('mod_cv_verifications')->insertGetId([
-            'client_id' => $clientId,
-            'verification_method' => $method,
-            'status' => 'pending',
-            'submitted_at' => date('Y-m-d H:i:s'),
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
-        ]);
+        // Check if there is an existing uncompleted session for this client to reuse
+        $existing = Capsule::table('mod_cv_verifications')
+            ->where('client_id', $clientId)
+            ->whereIn('status', ['pending', 'in_progress'])
+            ->orderByDesc('id')
+            ->first();
 
-        $clientRef = VerificationService::generateReference($verificationId, $clientId);
-        Capsule::table('mod_cv_verifications')
-            ->where('id', $verificationId)
-            ->update(['client_ref' => $clientRef, 'vendor_data' => $clientRef]);
+        if ($existing) {
+            $verificationId = (int) $existing->id;
+            Capsule::table('mod_cv_verifications')
+                ->where('id', $verificationId)
+                ->update([
+                    'verification_method' => $method,
+                    'status' => 'pending',
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            $clientRef = $existing->client_ref ?: VerificationService::generateReference($verificationId, $clientId);
+        } else {
+            $verificationId = Capsule::table('mod_cv_verifications')->insertGetId([
+                'client_id' => $clientId,
+                'verification_method' => $method,
+                'status' => 'pending',
+                'submitted_at' => date('Y-m-d H:i:s'),
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
 
-        // Store personal data separately (sensitive data isolation).
-        Capsule::table('mod_cv_personal_data')->insert(array_merge(
-            ['verification_id' => $verificationId, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')],
-            self::sanitizePersonal($personalData)
-        ));
+            $clientRef = VerificationService::generateReference($verificationId, $clientId);
+            Capsule::table('mod_cv_verifications')
+                ->where('id', $verificationId)
+                ->update(['client_ref' => $clientRef, 'vendor_data' => $clientRef]);
 
-        cv_log_audit($verificationId, 'verification_started', 0, 'method=' . $method);
+            // Store personal data separately (sensitive data isolation).
+            Capsule::table('mod_cv_personal_data')->insert(array_merge(
+                ['verification_id' => $verificationId, 'created_at' => date('Y-m-d H:i:s'), 'updated_at' => date('Y-m-d H:i:s')],
+                self::sanitizePersonal($personalData)
+            ));
+
+            cv_log_audit($verificationId, 'verification_started', 0, 'method=' . $method);
+        }
 
         $redirectUrl = '';
         $useDidit = ($method === 'didit' || $method === 'hybrid');

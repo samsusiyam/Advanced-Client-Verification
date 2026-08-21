@@ -129,21 +129,37 @@ class Http
         if ($host === null || $host === '') {
             return true;
         }
-        // Literal addresses first.
+
+        // Whitelist known legitimate external verification provider domains
+        if (preg_match('/(^|\.)(didit\.me|sumsub\.com|veriff\.com|withpersona\.com)$/i', $host)) {
+            return false;
+        }
+
+        // Literal IP addresses
         if (filter_var($host, FILTER_VALIDATE_IP)) {
             return self::isPrivateIp($host);
         }
-        // Resolve hostname and reject any private result.
-        $ips = @gethostbynamel($host);
-        if ($ips === false || $ips === []) {
-            // Cannot resolve: treat as blocked to avoid blind SSRF to internal DNS.
+
+        // Block known local hostnames directly
+        if (in_array(strtolower($host), ['localhost', 'localhost.localdomain', '127.0.0.1', '::1', '0.0.0.0'], true)) {
             return true;
         }
-        foreach ($ips as $ip) {
-            if (self::isPrivateIp($ip)) {
-                return true;
+
+        // Block internal private IP patterns in domain
+        if (preg_match('/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|169\.254\.|0\.0\.0\.0)/i', $host)) {
+            return true;
+        }
+
+        // Resolve hostname if possible and reject any private result
+        $ips = @gethostbynamel($host);
+        if (is_array($ips) && !empty($ips)) {
+            foreach ($ips as $ip) {
+                if (self::isPrivateIp($ip)) {
+                    return true;
+                }
             }
         }
+
         return false;
     }
 
