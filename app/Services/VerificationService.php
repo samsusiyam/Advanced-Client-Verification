@@ -122,6 +122,33 @@ class VerificationService
         return $affected;
     }
 
+    public static function deleteDocument(int $documentId, int $adminId = 0): bool
+    {
+        $doc = Capsule::table('mod_cv_documents')->where('id', $documentId)->first();
+        if (!$doc) {
+            return false;
+        }
+
+        $config = cv_get_config();
+        $storage = new \ClientVerification\Storage\DocumentStorage(
+            $config['storage_path'] ?? '',
+            (bool) ($config['storage_encryption'] ?? false),
+            $config['encryption_key'] ?? ''
+        );
+
+        if (!empty($doc->storage_path)) {
+            $storage->delete($doc->storage_path);
+        }
+
+        Capsule::table('mod_cv_documents')->where('id', $documentId)->delete();
+
+        if (function_exists('cv_log_audit')) {
+            cv_log_audit((int) $doc->verification_id, 'document_deleted', $adminId, 'Document #' . $documentId . ' (' . $doc->original_filename . ') deleted by admin #' . $adminId);
+        }
+
+        return true;
+    }
+
     public static function delete(int $verificationId, int $adminId = 0): bool
     {
         $v = Capsule::table('mod_cv_verifications')->where('id', $verificationId)->first();
@@ -129,9 +156,15 @@ class VerificationService
             return false;
         }
 
-        // 1. Delete physical files from disk securely
+        $config = cv_get_config();
+        $storage = new \ClientVerification\Storage\DocumentStorage(
+            $config['storage_path'] ?? '',
+            (bool) ($config['storage_encryption'] ?? false),
+            $config['encryption_key'] ?? ''
+        );
+
+        // 1. Delete all physical files from disk securely
         $docs = Capsule::table('mod_cv_documents')->where('verification_id', $verificationId)->get();
-        $storage = new \ClientVerification\Storage\DocumentStorage(cv_setting('storage_path', ''));
         foreach ($docs as $doc) {
             if (!empty($doc->storage_path)) {
                 $storage->delete($doc->storage_path);
@@ -139,7 +172,7 @@ class VerificationService
         }
 
         // Clean up empty directory if applicable
-        $storageBase = cv_setting('storage_path', '');
+        $storageBase = $config['storage_path'] ?? '';
         if (empty($storageBase)) {
             $storageBase = __DIR__ . '/../../storage';
         }

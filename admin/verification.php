@@ -21,8 +21,10 @@ if (isset($_GET['download']) && is_numeric($_GET['download'])) {
         );
         $content = $storage->read($doc->storage_path, (bool) $doc->encrypted);
         if ($content !== null) {
-            header('Content-Type: ' . Sanitizer::headerValue($doc->mime_type));
-            header('Content-Disposition: inline; filename="' . Sanitizer::headerValue($doc->original_filename) . '"');
+            $isDownload = ($_GET['mode'] ?? '') === 'download';
+            $disposition = $isDownload ? 'attachment' : 'inline';
+            header('Content-Type: ' . Sanitizer::headerValue($doc->mime_type ?: 'application/octet-stream'));
+            header('Content-Disposition: ' . $disposition . '; filename="' . Sanitizer::headerValue($doc->original_filename) . '"');
             header('X-Content-Type-Options: nosniff');
             header('Content-Length: ' . strlen($content));
             echo $content;
@@ -43,29 +45,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && Csrf::ch
 
     switch ($action) {
         case 'approve':
-            VerificationService::updateStatus($id, 'approved', $adminId, $note ?: 'admin_approved');
-            $feedbackMessage = 'Verification has been approved.';
+            VerificationService::updateStatus($id, 'approved', $adminId, $note);
+            $feedbackMessage = 'Verification approved successfully.';
             break;
         case 'reject':
-            VerificationService::updateStatus($id, 'rejected', $adminId, $note ?: 'admin_rejected');
-            $feedbackMessage = 'Verification has been rejected.';
-            $feedbackType = 'danger';
-            break;
-        case 'request_info':
-            VerificationService::requestInformation($id, $adminId, $note);
-            $feedbackMessage = 'Additional information requested from client.';
+            VerificationService::updateStatus($id, 'rejected', $adminId, $note);
+            $feedbackMessage = 'Verification rejected.';
             $feedbackType = 'warning';
             break;
-        case 'suspend':
-            VerificationService::suspend($id, $adminId, $note);
-            $feedbackMessage = 'Verification suspended.';
-            $feedbackType = 'danger';
+        case 'request_info':
+            VerificationService::updateStatus($id, 'in_progress', $adminId, $note);
+            $feedbackMessage = 'Additional information requested from client.';
+            $feedbackType = 'info';
             break;
         case 'manual_review':
-            Capsule::table('mod_cv_verifications')->where('id', $id)->update(['status' => 'under_review', 'manual_review_required' => 1, 'updated_at' => date('Y-m-d H:i:s')]);
-            cv_log_audit($id, 'manual_review', $adminId, $note);
-            $feedbackMessage = 'Verification set to Under Review status.';
+            VerificationService::updateStatus($id, 'under_review', $adminId, $note);
+            $feedbackMessage = 'Verification marked as under review.';
             $feedbackType = 'info';
+            break;
+        case 'suspend':
+            VerificationService::updateStatus($id, 'suspended', $adminId, $note);
+            $feedbackMessage = 'Verification suspended.';
+            $feedbackType = 'warning';
+            break;
+        case 'delete_doc':
+            $docId = (int) ($_POST['doc_id'] ?? 0);
+            if ($docId > 0 && VerificationService::deleteDocument($docId, $adminId)) {
+                $feedbackMessage = "Document #{$docId} has been permanently deleted.";
+            } else {
+                $feedbackMessage = "Could not delete document #{$docId}.";
+                $feedbackType = 'danger';
+            }
             break;
         case 'delete':
             VerificationService::delete($id, $adminId);
@@ -320,28 +330,56 @@ $audit = json_decode($row->audit_log ?? '[]', true);
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                     <?php foreach ($documents as $doc): 
                         $docStatusBadge = match($doc->status) {
-                            'approved' => '<span class="label label-success">Approved</span>',
-                            'rejected' => '<span class="label label-danger">Rejected</span>',
-                            default => '<span class="label label-warning">Pending</span>',
+                            'approved' => '<span class="label label-success" style="font-size: 11px;">Approved</span>',
+                            'rejected' => '<span class="label label-danger" style="font-size: 11px;">Rejected</span>',
+                            default => '<span class="label label-warning" style="font-size: 11px;">Pending</span>',
                         };
+
+                        $formattedType = ucwords(str_replace('_', ' ', $doc->document_type));
+                        $formattedSide = !empty($doc->side) ? strtoupper($doc->side) : 'FRONT';
+                        $docDisplayTitle = $formattedType . ' (' . $formattedSide . ')';
+                        $sizeKb = round(($doc->file_size ?? 0) / 1024, 1);
+                        $isPdf = stripos($doc->mime_type ?? '', 'pdf') !== false || preg_match('/\.pdf$/i', $doc->original_filename);
                     ?>
-                        <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc;">
-                            <div>
-                                <strong style="text-transform: capitalize; color: #1e293b; font-size: 14px;">
-                                    <?php echo htmlspecialchars(str_replace('_', ' ', $doc->document_type)); ?>
-                                </strong>
-                                <?php if (!empty($doc->side)): ?>
-                                    <span class="label label-default" style="font-size: 10px; text-transform: uppercase;"><?php echo htmlspecialchars($doc->side); ?></span>
-                                <?php endif; ?>
-                                <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
-                                    File: <code><?php echo htmlspecialchars($doc->original_filename); ?></code> &bull; Size: <?php echo round($doc->file_size / 1024, 1); ?> KB
+                        <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 38px; height: 38px; background: <?php echo $isPdf ? '#fee2e2' : '#eff6ff'; ?>; color: <?php echo $isPdf ? '#dc2626' : '#2563eb'; ?>; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0;">
+                                    <i class="fa <?php echo $isPdf ? 'fa-file-pdf-o' : 'fa-file-image-o'; ?>"></i>
+                                </div>
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <strong style="color: #1e293b; font-size: 14px;"><?php echo htmlspecialchars($docDisplayTitle); ?></strong>
+                                        <?php if ($doc->encrypted): ?>
+                                            <span title="Encrypted at rest" style="color: #16a34a; font-size: 12px;"><i class="fa fa-lock"></i></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+                                        File: <code><?php echo htmlspecialchars($doc->original_filename); ?></code> &bull; Size: <strong><?php echo $sizeKb; ?> KB</strong>
+                                    </div>
                                 </div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
                                 <?php echo $docStatusBadge; ?>
-                                <a href="addonmodules.php?module=clientverification&action=verification&id=<?php echo (int) $id; ?>&download=<?php echo (int) $doc->id; ?>" target="_blank" class="btn btn-primary btn-xs">
-                                    <i class="fa fa-external-link"></i> View Document
+
+                                <!-- View Document Popup Button -->
+                                <button type="button" class="btn btn-primary btn-sm" style="font-weight: 600;" onclick="cvOpenDocModal(<?php echo (int) $doc->id; ?>, '<?php echo addslashes(htmlspecialchars($docDisplayTitle)); ?>', '<?php echo addslashes(htmlspecialchars($doc->original_filename)); ?>', '<?php echo $sizeKb; ?> KB', '<?php echo addslashes($doc->mime_type ?? ''); ?>');">
+                                    <i class="fa fa-eye"></i> View Document
+                                </button>
+
+                                <!-- Direct Download Button -->
+                                <a href="addonmodules.php?module=clientverification&action=verification&id=<?php echo (int) $id; ?>&download=<?php echo (int) $doc->id; ?>&mode=download" target="_blank" class="btn btn-default btn-sm" style="font-weight: 600;">
+                                    <i class="fa fa-download"></i> Download
                                 </a>
+
+                                <!-- Delete Document Button -->
+                                <button type="button" class="btn btn-danger btn-sm" title="Delete document" onclick="if(confirm('Are you sure you want to permanently delete this document (#<?php echo (int)$doc->id; ?>)?')) { document.getElementById('cv_del_doc_<?php echo (int)$doc->id; ?>').submit(); }">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                                <form method="post" id="cv_del_doc_<?php echo (int)$doc->id; ?>" action="addonmodules.php?module=clientverification&action=verification&id=<?php echo (int) $id; ?>" style="display: none;">
+                                    <?php echo Csrf::field(); ?>
+                                    <input type="hidden" name="action" value="delete_doc">
+                                    <input type="hidden" name="doc_id" value="<?php echo (int) $doc->id; ?>">
+                                </form>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -381,4 +419,107 @@ $audit = json_decode($row->audit_log ?? '[]', true);
         </div>
     </div>
 </div>
+
+<!-- Interactive Lightbox / Modal Popup for Document Preview -->
+<div id="cv_doc_preview_modal" style="display: none; position: fixed; z-index: 999999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(4px); overflow-y: auto;">
+    <div style="background: #ffffff; width: 800px; max-width: 94%; margin: 35px auto; border-radius: 10px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); overflow: hidden; position: relative;">
+        <!-- Modal Header -->
+        <div style="background: #f8fafc; padding: 16px 22px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h4 style="margin: 0 0 3px 0; font-size: 16px; font-weight: 700; color: #1e293b;" id="cv_modal_title">Document Preview</h4>
+                <div style="font-size: 12px; color: #64748b;" id="cv_modal_meta">Loading metadata...</div>
+            </div>
+            <button type="button" onclick="cvCloseDocModal();" style="background: none; border: none; font-size: 26px; color: #64748b; cursor: pointer; line-height: 1; padding: 0 4px;" title="Close">&times;</button>
+        </div>
+
+        <!-- Modal Body (Preview Canvas) -->
+        <div style="padding: 20px; text-align: center; background: #0f172a; min-height: 380px; display: flex; align-items: center; justify-content: center; position: relative;" id="cv_modal_body">
+            <img id="cv_modal_img" src="" alt="Document Preview" style="max-width: 100%; max-height: 560px; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.5); object-fit: contain; display: none;">
+            <iframe id="cv_modal_iframe" src="" style="display: none; width: 100%; height: 540px; border: none; border-radius: 6px; background: #ffffff;"></iframe>
+            <div id="cv_modal_loader" style="color: #ffffff; font-size: 14px;">
+                <i class="fa fa-spinner fa-spin fa-2x"></i><br>
+                <span style="display: inline-block; margin-top: 8px;">Loading document preview...</span>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="background: #f8fafc; padding: 14px 22px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <span style="font-size: 12px; color: #64748b;">
+                <i class="fa fa-shield text-success"></i> Encrypted KYC Verification Document
+            </span>
+            <div style="display: flex; gap: 8px;">
+                <a id="cv_modal_download_btn" href="#" target="_blank" class="btn btn-primary" style="font-weight: 600;">
+                    <i class="fa fa-download"></i> Download Document
+                </a>
+                <button type="button" class="btn btn-default" onclick="cvCloseDocModal();" style="font-weight: 600;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function cvOpenDocModal(docId, docTitle, filename, fileSize, mimeType) {
+    var modal = document.getElementById('cv_doc_preview_modal');
+    var titleElem = document.getElementById('cv_modal_title');
+    var metaElem = document.getElementById('cv_modal_meta');
+    var imgElem = document.getElementById('cv_modal_img');
+    var iframeElem = document.getElementById('cv_modal_iframe');
+    var loaderElem = document.getElementById('cv_modal_loader');
+    var downloadBtn = document.getElementById('cv_modal_download_btn');
+
+    var viewUrl = 'addonmodules.php?module=clientverification&action=verification&id=<?php echo (int) $id; ?>&download=' + docId + '&mode=inline';
+    var downloadUrl = 'addonmodules.php?module=clientverification&action=verification&id=<?php echo (int) $id; ?>&download=' + docId + '&mode=download';
+
+    titleElem.textContent = docTitle;
+    metaElem.textContent = 'File: ' + filename + ' • Size: ' + fileSize;
+    downloadBtn.href = downloadUrl;
+
+    if (loaderElem) loaderElem.style.display = 'block';
+    if (imgElem) imgElem.style.display = 'none';
+    if (iframeElem) iframeElem.style.display = 'none';
+
+    if (mimeType && mimeType.indexOf('pdf') !== -1) {
+        iframeElem.src = viewUrl;
+        iframeElem.onload = function() {
+            if (loaderElem) loaderElem.style.display = 'none';
+            iframeElem.style.display = 'block';
+        };
+    } else {
+        imgElem.src = viewUrl;
+        imgElem.onload = function() {
+            if (loaderElem) loaderElem.style.display = 'none';
+            imgElem.style.display = 'inline-block';
+        };
+        imgElem.onerror = function() {
+            if (loaderElem) loaderElem.innerHTML = '<span style="color: #f87171;"><i class="fa fa-exclamation-triangle"></i> Failed to preview document image. Please use the download button below.</span>';
+        };
+    }
+
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function cvCloseDocModal() {
+    var modal = document.getElementById('cv_doc_preview_modal');
+    var iframeElem = document.getElementById('cv_modal_iframe');
+    var imgElem = document.getElementById('cv_modal_img');
+    if (iframeElem) iframeElem.src = '';
+    if (imgElem) imgElem.src = '';
+    if (modal) modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+// Close modal when pressing Escape key or clicking on dark overlay backdrop
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' || e.keyCode === 27) {
+        cvCloseDocModal();
+    }
+});
+
+document.getElementById('cv_doc_preview_modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cvCloseDocModal();
+    }
+});
+</script>
 
