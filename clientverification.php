@@ -98,6 +98,11 @@ function clientverification_output($vars)
                 $table->text('info_request_note')->nullable();
             });
         }
+        if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'rejection_reason')) {
+            Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                $table->text('rejection_reason')->nullable();
+            });
+        }
     } catch (\Throwable $e) {}
 
     // Ensure email templates & settings exist

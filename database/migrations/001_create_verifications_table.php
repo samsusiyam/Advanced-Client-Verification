@@ -48,5 +48,15 @@ function migration_001_create_verifications_table()
                 $table->string('document_number', 100)->nullable()->after('client_ref');
             });
         }
+        if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'rejection_reason')) {
+            Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                $table->text('rejection_reason')->nullable();
+            });
+        }
+        if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'info_request_note')) {
+            Capsule::schema()->table('mod_cv_verifications', function ($table) {
+                $table->text('info_request_note')->nullable();
+            });
+        }
     }
 }
