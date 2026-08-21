@@ -32,6 +32,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cv_save_settings'])) 
             'allowed_extensions',
             'risk_threshold_approve',
             'risk_threshold_review',
+            'mail_client_started',
+            'mail_client_approved',
+            'mail_client_rejected',
+            'mail_client_under_review',
+            'mail_client_info_requested',
+            'mail_client_expiring',
+            'mail_client_expired',
+            'mail_admin_new_submission',
+            'mail_admin_didit_completed',
+            'mail_admin_high_risk',
+            'mail_admin_info_response',
+            'admin_notification_emails',
         ];
 
         foreach ($fields as $f) {
@@ -40,7 +52,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cv_save_settings'])) 
             // Checkbox handling
             if (in_array($f, ['didit_auto_approve', 'storage_encryption'], true)) {
                 $val = isset($_POST[$f]) ? '1' : '0';
-            } elseif (in_array($f, ['enabled', 'enable_didit', 'enable_manual'], true)) {
+            } elseif (in_array($f, [
+                'enabled', 'enable_didit', 'enable_manual',
+                'mail_client_started', 'mail_client_approved', 'mail_client_rejected',
+                'mail_client_under_review', 'mail_client_info_requested', 'mail_client_expiring', 'mail_client_expired',
+                'mail_admin_new_submission', 'mail_admin_didit_completed', 'mail_admin_high_risk', 'mail_admin_info_response',
+            ], true)) {
                 $val = isset($_POST[$f]) ? 'yes' : 'no';
             } else {
                 $val = trim((string)$val);
@@ -252,6 +269,9 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
     <div class="cv-nav-tabs">
         <div class="cv-tab-item <?php echo $activeTab === 'general' ? 'active' : ''; ?>" onclick="cvSwitchTab('general')">
             <i class="fa fa-sliders"></i> General
+        </div>
+        <div class="cv-tab-item <?php echo $activeTab === 'notifications' ? 'active' : ''; ?>" onclick="cvSwitchTab('notifications')">
+            <i class="fa fa-envelope"></i> Notifications &amp; Routing
         </div>
         <div class="cv-tab-item <?php echo $activeTab === 'didit' ? 'active' : ''; ?>" onclick="cvSwitchTab('didit')">
             <i class="fa fa-id-badge"></i> Didit Automation
@@ -504,6 +524,124 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
                     <span class="label label-success" style="padding: 6px 12px; font-size: 12px;">0 - 30: Low Risk &rarr; Auto-Approve</span>
                     <span class="label label-warning" style="padding: 6px 12px; font-size: 12px;">31 - 70: Medium Risk &rarr; Staff Review</span>
                     <span class="label label-danger" style="padding: 6px 12px; font-size: 12px;">71 - 100: High Risk &rarr; Auto-Reject</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: NOTIFICATIONS & ROUTING -->
+    <div class="cv-tab-panel <?php echo $activeTab === 'notifications' ? 'active' : ''; ?>" id="tab-notifications">
+        <!-- Client / User Email Notifications -->
+        <div class="cv-section">
+            <div class="cv-section-title">
+                <i class="fa fa-user text-primary"></i> Client (User) Email Notifications
+            </div>
+            <div class="cv-section-desc">
+                Configure which email notifications are automatically sent to clients during their verification lifecycle using native WHMCS email templates.
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_client_started" value="yes" <?php echo cv_setting('mail_client_started', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-play text-primary"></i> Verification Started</span>
+                    </label>
+                    <div class="cv-field-hint">Send email when a client initiates a new verification session.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_client_under_review" value="yes" <?php echo cv_setting('mail_client_under_review', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-clock-o text-warning"></i> Documents Under Review</span>
+                    </label>
+                    <div class="cv-field-hint">Send email confirming submitted documents are under compliance review.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_client_approved" value="yes" <?php echo cv_setting('mail_client_approved', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-check-circle text-success"></i> Verification Approved</span>
+                    </label>
+                    <div class="cv-field-hint">Send congratulatory email when identity documents are fully approved.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_client_rejected" value="yes" <?php echo cv_setting('mail_client_rejected', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-times-circle text-danger"></i> Verification Rejected</span>
+                    </label>
+                    <div class="cv-field-hint">Send email notifying the client of rejection with compliance reason.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_client_info_requested" value="yes" <?php echo cv_setting('mail_client_info_requested', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-info-circle text-info"></i> Additional Information Requested</span>
+                    </label>
+                    <div class="cv-field-hint">Send email when admin requests clearer photos or specific documents.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_client_expiring" value="yes" <?php echo cv_setting('mail_client_expiring', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-calendar text-warning"></i> Verification Expiring / Expired</span>
+                    </label>
+                    <div class="cv-field-hint">Send annual expiry reminders and expired notices to clients via cron.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Alerts & Routing -->
+        <div class="cv-section">
+            <div class="cv-section-title">
+                <i class="fa fa-shield text-danger"></i> Admin &amp; Staff Notification Alerts
+            </div>
+            <div class="cv-section-desc">
+                Control which critical KYC events trigger notifications to your compliance team and configure destination email addresses.
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_admin_new_submission" value="yes" <?php echo cv_setting('mail_admin_new_submission', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-file-text-o text-primary"></i> New Manual Document Submission</span>
+                    </label>
+                    <div class="cv-field-hint">Alert staff when a customer uploads identity documents requiring review.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_admin_high_risk" value="yes" <?php echo cv_setting('mail_admin_high_risk', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-exclamation-triangle text-danger"></i> High Risk Verification Detected</span>
+                    </label>
+                    <div class="cv-field-hint">Urgent alert when Risk Engine or AI flags high risk or suspicious traits.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_admin_info_response" value="yes" <?php echo cv_setting('mail_admin_info_response', 'yes') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-reply text-info"></i> Client Uploaded Requested Info</span>
+                    </label>
+                    <div class="cv-field-hint">Alert staff when a client submits requested documents following an info request.</div>
+                </div>
+
+                <div class="col-md-6 cv-field">
+                    <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" name="mail_admin_didit_completed" value="yes" <?php echo cv_setting('mail_admin_didit_completed', 'no') === 'yes' ? 'checked' : ''; ?>>
+                        <span><i class="fa fa-bolt text-success"></i> Didit AI Verification Finished</span>
+                    </label>
+                    <div class="cv-field-hint">Send alert every time an automated Didit AI biometric session completes.</div>
+                </div>
+            </div>
+
+            <!-- Admin Recipient Emails -->
+            <div class="cv-field" style="margin-top: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 20px;">
+                <label class="cv-field-label" style="font-size: 14px; font-weight: 700; color: #1e293b;">
+                    <i class="fa fa-envelope-o text-primary"></i> Admin Alert Recipient Email Address(es)
+                </label>
+                <input type="text" name="admin_notification_emails" class="form-control" value="<?php echo htmlspecialchars(cv_setting('admin_notification_emails', '')); ?>" placeholder="e.g. compliance@yourdomain.com, security@yourdomain.com">
+                <div class="cv-field-hint" style="margin-top: 6px; font-size: 12px; color: #64748b;">
+                    <i class="fa fa-info-circle"></i> Enter specific email addresses separated by commas (<code>,</code>) to route KYC admin alerts directly. If left blank, notifications will be sent to default WHMCS System Administrators.
                 </div>
             </div>
         </div>

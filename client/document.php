@@ -178,12 +178,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($anyUploaded && $v) {
+        $prevStatus = $v->status;
         Capsule::table('mod_cv_verifications')->where('id', $verificationId)->update([
             'status' => 'under_review',
             'manual_review_required' => 1,
             'updated_at' => date('Y-m-d H:i:s')
         ]);
         cv_log_audit($verificationId, 'documents_submitted', 0, 'Documents uploaded by client');
+
+        // Trigger notifications
+        \ClientVerification\Mail\Notifier::reviewRequired($clientId);
+        if ($prevStatus === 'info_requested') {
+            \ClientVerification\Mail\Notifier::adminInfoResponse($verificationId, $clientId);
+        } else {
+            \ClientVerification\Mail\Notifier::adminNewSubmission($verificationId, $clientId, 'manual');
+        }
         
         echo '<div style="max-width: 600px; margin: 30px auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 32px 24px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">
             <div style="width: 64px; height: 64px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 28px;">

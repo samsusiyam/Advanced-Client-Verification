@@ -181,8 +181,15 @@ class HybridVerificationService
         $config = cv_get_config();
         $autoApproveRaw = $config['didit_auto_approve'] ?? '1';
         $autoApprove = !in_array(strtolower((string) $autoApproveRaw), ['off', '0', '', 'no'], true);
-
         $decision = $risk['action'];
+
+        // Alert admin if high risk detected
+        if (($risk['level'] ?? '') === 'high') {
+            Notifier::adminHighRisk($verificationId, (int) $row->client_id, (float) ($risk['score'] ?? 0), (array) ($risk['reasons'] ?? []));
+        }
+        if ($row->verification_method === 'didit') {
+            Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, (string) $result->status);
+        }
 
         // Provider error and Didit mode -> manual review, never approve.
         if ($result->decision === KycResult::DECISION_ERROR && $row->verification_method !== 'manual') {

@@ -64,6 +64,51 @@ if (!function_exists('cv_setting_set')) {
     }
 }
 
+if (!function_exists('cv_insert_default_settings')) {
+    function cv_insert_default_settings()
+    {
+        $defaults = [
+            'enabled' => 'yes',
+            'verification_mode' => 'hybrid',
+            'enable_didit' => 'yes',
+            'enable_manual' => 'yes',
+            'verification_expiry_days' => '365',
+            'rate_limit_attempts' => '5',
+            'audit_log_retention_days' => '0',
+            'storage_encryption' => '0',
+            'max_file_size' => '10',
+            'allowed_extensions' => 'jpg,jpeg,png,pdf',
+            'risk_threshold_approve' => '30',
+            'risk_threshold_review' => '70',
+            'mail_client_started' => 'yes',
+            'mail_client_approved' => 'yes',
+            'mail_client_rejected' => 'yes',
+            'mail_client_under_review' => 'yes',
+            'mail_client_info_requested' => 'yes',
+            'mail_client_expiring' => 'yes',
+            'mail_client_expired' => 'yes',
+            'mail_admin_new_submission' => 'yes',
+            'mail_admin_didit_completed' => 'no',
+            'mail_admin_high_risk' => 'yes',
+            'mail_admin_info_response' => 'yes',
+            'admin_notification_emails' => '',
+        ];
+
+        try {
+            foreach ($defaults as $k => $v) {
+                if (!Capsule::table('mod_cv_settings')->where('setting_key', $k)->exists()) {
+                    Capsule::table('mod_cv_settings')->insert([
+                        'setting_key' => $k,
+                        'setting_value' => $v,
+                        'created_at' => date('Y-m-d H:i:s'),
+                        'updated_at' => date('Y-m-d H:i:s'),
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {}
+    }
+}
+
 if (!function_exists('cv_encrypt_credentials')) {
     /**
      * Encrypt sensitive config using WHMCS local API encryption (open source, no backdoors).
