@@ -6,6 +6,12 @@ use ClientVerification\Security\Csrf;
 
 $clientId = (int) (($_SESSION['clientsdetails']['userid'] ?? 0) ?: ($_SESSION['uid'] ?? 0));
 $id = (int) ($_GET['id'] ?? 0);
+if ($id <= 0) {
+    $activeV = \ClientVerification\Services\VerificationService::getActiveForClient($clientId);
+    if ($activeV) {
+        $id = (int) $activeV->id;
+    }
+}
 $v = Capsule::table('mod_cv_verifications')->where('id', $id)->where('client_id', $clientId)->first();
 
 if (!$v) {

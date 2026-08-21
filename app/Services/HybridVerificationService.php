@@ -28,24 +28,36 @@ class HybridVerificationService
     {
         $method = ($mode === 'didit') ? 'didit' : (($mode === 'manual') ? 'manual' : 'hybrid');
 
-        // Look for an existing uncompleted / in-progress session for this client to reuse
-        // An uncompleted session is any session not approved/rejected that has no uploaded files yet
-        $candidates = Capsule::table('mod_cv_verifications')
+        // 1. Look for existing active verification for this client
+        $existing = Capsule::table('mod_cv_verifications')
             ->where('client_id', $clientId)
-            ->whereNotIn('status', ['approved', 'rejected'])
+            ->whereNotIn('status', ['rejected', 'expired'])
             ->orderByDesc('id')
-            ->get();
-
-        $existing = null;
-        foreach ($candidates as $cand) {
-            $hasDocs = Capsule::table('mod_cv_documents')->where('verification_id', $cand->id)->exists();
-            if (!$hasDocs && !in_array($cand->didit_status, ['Approved', 'Declined', 'Expired'])) {
-                $existing = $cand;
-                break;
-            }
-        }
+            ->first();
 
         if ($existing) {
+            // If already approved or suspended, do not allow creating a new verification
+            if (in_array($existing->status, ['approved', 'suspended'], true)) {
+                return [
+                    'verification_id' => (int) $existing->id,
+                    'redirect_url' => 'index.php?m=clientverification',
+                    'method' => $existing->verification_method,
+                ];
+            }
+
+            $hasDocs = Capsule::table('mod_cv_documents')->where('verification_id', $existing->id)->exists();
+
+            // If under_review with uploaded documents or info_requested, redirect directly to status view
+            if (($existing->status === 'under_review' && $hasDocs) || $existing->status === 'info_requested') {
+                return [
+                    'verification_id' => (int) $existing->id,
+                    'redirect_url' => 'index.php?m=clientverification&action=verification&id=' . (int) $existing->id,
+                    'method' => $existing->verification_method,
+                ];
+            }
+
+            // Otherwise, it is an incomplete / in-progress session (no documents uploaded yet):
+            // REUSE THIS EXACT EXISTING RECORD - DO NOT CREATE A NEW ID!
             $verificationId = (int) $existing->id;
             Capsule::table('mod_cv_verifications')
                 ->where('id', $verificationId)
@@ -56,26 +68,26 @@ class HybridVerificationService
                 ]);
             $clientRef = $existing->client_ref ?: VerificationService::generateReference($verificationId, $clientId);
 
-            // Clean up any other empty unsubmitted duplicate sessions for this client
+            // Clean up any extra orphan empty sessions for this client
             try {
                 $duplicateEmptyIds = Capsule::table('mod_cv_verifications')
                     ->where('client_id', $clientId)
                     ->where('id', '!=', $verificationId)
                     ->whereNotIn('status', ['approved', 'rejected'])
-                    ->whereNotExists(function ($q) {
-                        $q->select(Capsule::raw(1))
-                          ->from('mod_cv_documents')
-                          ->whereRaw('mod_cv_documents.verification_id = mod_cv_verifications.id');
-                    })
                     ->pluck('id')
                     ->toArray();
 
                 if (!empty($duplicateEmptyIds)) {
-                    Capsule::table('mod_cv_verifications')->whereIn('id', $duplicateEmptyIds)->delete();
-                    Capsule::table('mod_cv_personal_data')->whereIn('verification_id', $duplicateEmptyIds)->delete();
+                    foreach ($duplicateEmptyIds as $dupId) {
+                        if (!Capsule::table('mod_cv_documents')->where('verification_id', $dupId)->exists()) {
+                            Capsule::table('mod_cv_verifications')->where('id', $dupId)->delete();
+                            Capsule::table('mod_cv_personal_data')->where('verification_id', $dupId)->delete();
+                        }
+                    }
                 }
             } catch (\Throwable $e) {}
         } else {
+            // ONLY create a new record if client has NO verification record, or previous one was 'rejected' / 'expired' (or deleted)
             $verificationId = Capsule::table('mod_cv_verifications')->insertGetId([
                 'client_id' => $clientId,
                 'verification_method' => $method,
@@ -128,12 +140,14 @@ class HybridVerificationService
                     ->where('id', $verificationId)
                     ->update(['status' => 'pending', 'manual_review_required' => 1]);
                 cv_log_audit($verificationId, 'provider_error', 0, $e->getMessage());
+                $redirectUrl = 'index.php?m=clientverification&action=document&id=' . $verificationId;
             }
         } else {
-            // Manual mode or Didit credentials missing -> allow manual document upload
+            // Manual mode -> direct to document upload page
             Capsule::table('mod_cv_verifications')
                 ->where('id', $verificationId)
                 ->update(['status' => 'pending', 'manual_review_required' => 1]);
+            $redirectUrl = 'index.php?m=clientverification&action=document&id=' . $verificationId;
         }
 
         return [
