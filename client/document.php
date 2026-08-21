@@ -36,6 +36,21 @@ if (isset($_GET['download']) && is_numeric($_GET['download'])) {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $redirectId = (int) ($_GET['id'] ?? 0);
+    if ($redirectId <= 0) {
+        $activeV = \ClientVerification\Services\VerificationService::getActiveForClient($clientId);
+        $redirectId = $activeV ? (int) $activeV->id : 0;
+    }
+    $target = $redirectId > 0 ? "index.php?m=clientverification&action=verification&id={$redirectId}" : "index.php?m=clientverification";
+    if (!headers_sent()) {
+        header("Location: {$target}");
+    }
+    echo '<script>window.location.href = ' . json_encode($target) . ';</script>';
+    echo '<div style="text-align: center; padding: 40px; font-family: sans-serif;"><p>Loading verification session...</p><a href="' . htmlspecialchars($target) . '" class="btn btn-primary" style="font-weight: 600;">Continue to Verification &raquo;</a></div>';
+    return;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!Csrf::check($_POST['cv_token'] ?? null)) {
         echo '<div class="alert alert-danger">Security token invalid.</div>';

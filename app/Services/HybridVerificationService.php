@@ -140,14 +140,14 @@ class HybridVerificationService
                     ->where('id', $verificationId)
                     ->update(['status' => 'pending', 'manual_review_required' => 1]);
                 cv_log_audit($verificationId, 'provider_error', 0, $e->getMessage());
-                $redirectUrl = 'index.php?m=clientverification&action=document&id=' . $verificationId;
+                $redirectUrl = 'index.php?m=clientverification&action=verification&id=' . $verificationId;
             }
         } else {
             // Manual mode -> direct to document upload page
             Capsule::table('mod_cv_verifications')
                 ->where('id', $verificationId)
                 ->update(['status' => 'pending', 'manual_review_required' => 1]);
-            $redirectUrl = 'index.php?m=clientverification&action=document&id=' . $verificationId;
+            $redirectUrl = 'index.php?m=clientverification&action=verification&id=' . $verificationId;
         }
 
         return [
