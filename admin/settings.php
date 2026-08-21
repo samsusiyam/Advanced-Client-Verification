@@ -375,14 +375,17 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
         </div>
 
         <div class="cv-section">
-            <div class="cv-section-title"><i class="fa fa-link text-primary"></i> Inbound Webhook Callback URL</div>
-            <div class="cv-section-desc">Paste this URL into your Didit Dashboard under Webhooks:</div>
+            <div class="cv-section-title"><i class="fa fa-link text-primary"></i> Inbound Webhook Destination URL</div>
+            <div class="cv-section-desc">Paste this URL into your Didit Dashboard under <strong>API &amp; Webhooks &gt; Webhooks &gt; Add Destination</strong>:</div>
 
             <div class="cv-input-group" style="max-width: 680px;">
-                <input type="text" id="cv_webhook_callback" class="form-control cv-input-with-addon" value="<?php echo htmlspecialchars(cv_callback_url()); ?>" readonly style="background: #f8fafc; font-family: monospace;">
-                <button type="button" class="cv-btn-addon" onclick="navigator.clipboard.writeText(document.getElementById('cv_webhook_callback').value); alert('Webhook Callback URL copied to clipboard!');">
+                <input type="text" id="cv_webhook_callback" class="form-control cv-input-with-addon" value="<?php echo htmlspecialchars(cv_webhook_url()); ?>" readonly style="background: #f8fafc; font-family: monospace;">
+                <button type="button" class="cv-btn-addon" onclick="navigator.clipboard.writeText(document.getElementById('cv_webhook_callback').value); alert('Webhook Destination URL copied to clipboard!');">
                     <i class="fa fa-copy"></i> Copy URL
                 </button>
+            </div>
+            <div class="cv-field-hint" style="margin-top: 6px;">
+                Browser Redirect Callback URL (sent automatically per session): <code><?php echo htmlspecialchars(cv_callback_url()); ?></code>
             </div>
         </div>
     </div>

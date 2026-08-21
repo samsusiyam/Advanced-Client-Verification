@@ -149,6 +149,9 @@ function clientverification_clientarea($vars)
         case 'document':
             require __DIR__ . '/client/document.php';
             break;
+        case 'callback':
+            require __DIR__ . '/client/callback.php';
+            break;
         default:
             require __DIR__ . '/client/index.php';
             break;

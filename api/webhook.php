@@ -41,6 +41,82 @@ if (!defined('WHMCS')) {
     }
 }
 
+use Illuminate\Database\Capsule\Manager as Capsule;
+
+// Handle browser GET callbacks (when Didit redirects the user's browser upon finishing KYC)
+$isGet = ($_SERVER['REQUEST_METHOD'] === 'GET');
+$sessionId = trim((string)($_GET['verificationSessionId'] ?? ($_GET['session_id'] ?? ($_GET['verification_session_id'] ?? ''))));
+$statusParam = trim((string)($_GET['status'] ?? ''));
+
+if ($isGet || !empty($sessionId)) {
+    $verificationId = null;
+
+    if ($sessionId) {
+        $vRow = Capsule::table('mod_cv_verifications')
+            ->where('didit_session_id', $sessionId)
+            ->first();
+
+        if ($vRow) {
+            $verificationId = $vRow->id;
+        }
+    }
+
+    if (!$verificationId) {
+        $vRow = Capsule::table('mod_cv_verifications')
+            ->whereIn('status', ['pending', 'in_progress', 'under_review'])
+            ->orderByDesc('id')
+            ->first();
+
+        if ($vRow) {
+            $verificationId = $vRow->id;
+            if ($sessionId && empty($vRow->didit_session_id)) {
+                Capsule::table('mod_cv_verifications')
+                    ->where('id', $vRow->id)
+                    ->update(['didit_session_id' => $sessionId]);
+            }
+        }
+    }
+
+    if ($verificationId && $sessionId) {
+        $config = cv_get_config();
+        $apiKey = $config['didit_api_key'] ?? ($config['api_key'] ?? '');
+        $workflowId = $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? '');
+
+        if ($apiKey && $workflowId) {
+            try {
+                $provider = new \ClientVerification\Providers\DiditProvider(
+                    $apiKey,
+                    $workflowId,
+                    $config['didit_webhook_secret'] ?? '',
+                    cv_callback_url()
+                );
+
+                $result = $provider->getStatus($sessionId);
+                if ($result->status !== 'error') {
+                    \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
+                } elseif (strcasecmp($statusParam, 'Approved') === 0) {
+                    \ClientVerification\Services\VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_browser_approved');
+                }
+            } catch (\Throwable $e) {
+                if (strcasecmp($statusParam, 'Approved') === 0) {
+                    \ClientVerification\Services\VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_browser_approved');
+                }
+            }
+        } elseif (strcasecmp($statusParam, 'Approved') === 0) {
+            \ClientVerification\Services\VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_browser_approved');
+        }
+    }
+
+    $dest = $verificationId
+        ? cv_system_url() . '/index.php?m=clientverification&action=verification&id=' . (int) $verificationId
+        : cv_system_url() . '/index.php?m=clientverification';
+
+    header('Location: ' . $dest);
+    echo '<script>window.location.href = ' . json_encode($dest) . ';</script>';
+    exit;
+}
+
+// Inbound Server-to-Server Webhook (POST)
 $rawBody = file_get_contents('php://input');
 if ($rawBody === false) {
     $rawBody = '';

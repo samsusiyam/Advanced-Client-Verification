@@ -292,11 +292,11 @@ if (!function_exists('cv_is_client_verified')) {
     }
 }
 
-if (!function_exists('cv_callback_url')) {
+if (!function_exists('cv_system_url')) {
     /**
-     * Build the public webhook callback URL.
+     * Get base WHMCS System URL.
      */
-    function cv_callback_url(): string
+    function cv_system_url(): string
     {
         $systemUrl = '';
         if (class_exists('\\WHMCS\\Config\\Setting')) {
@@ -309,7 +309,27 @@ if (!function_exists('cv_callback_url')) {
         if (!$systemUrl) {
             $systemUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
         }
-        return rtrim($systemUrl, '/') . '/modules/addons/clientverification/api/webhook.php';
+        return rtrim($systemUrl, '/');
+    }
+}
+
+if (!function_exists('cv_callback_url')) {
+    /**
+     * Build the browser redirect callback URL for when client finishes Didit verification.
+     */
+    function cv_callback_url(): string
+    {
+        return cv_system_url() . '/index.php?m=clientverification&action=callback';
+    }
+}
+
+if (!function_exists('cv_webhook_url')) {
+    /**
+     * Build the public inbound server-to-server webhook destination URL for Didit events.
+     */
+    function cv_webhook_url(): string
+    {
+        return cv_system_url() . '/modules/addons/clientverification/api/webhook.php';
     }
 }
 
