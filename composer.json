@@ -18,6 +18,16 @@
             "ClientVerification\\": "app/"
         }
     },
+    "extra": {
+        "whmcs": {
+            "name": "clientverification",
+            "displayName": "Advanced Client Verification",
+            "author": "HostNibo",
+            "version": "1.0.0",
+            "logo": "logo.png",
+            "supportUrl": "https://siyam.bio.link"
+        }
+    },
     "config": {
         "optimize-autoloader": true
     },
