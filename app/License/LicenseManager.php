@@ -34,10 +34,10 @@ class LicenseManager
 
     public function __construct()
     {
-        $this->serverUrl  = self::DEFAULT_SERVER_URL;
-        $this->productKey = self::DEFAULT_PRODUCT_KEY;
-        $this->apiKey     = self::DEFAULT_API_KEY;
-        $this->apiSecret  = self::DEFAULT_API_SECRET;
+        $this->serverUrl  = $this->resolveServerUrl();
+        $this->productKey = $this->resolveProductKey();
+        $this->apiKey     = $this->resolveApiKey();
+        $this->apiSecret  = $this->resolveApiSecret();
         $this->cacheDir   = dirname(__DIR__, 2) . '/storage/license';
 
         if (!is_dir($this->cacheDir)) {
@@ -59,6 +59,81 @@ class LicenseManager
     public static function isLicensed(): bool
     {
         return self::getInstance()->checkLicenseValid();
+    }
+
+    /**
+     * Resolve Server URL: supports custom DB setting, constant, local environment auto-detection, and production default.
+     */
+    public function resolveServerUrl(): string
+    {
+        // 1. Explicit PHP constant (e.g. for development / testing)
+        if (defined('CV_LICENSE_SERVER') && !empty(constant('CV_LICENSE_SERVER'))) {
+            return rtrim(constant('CV_LICENSE_SERVER'), '/');
+        }
+
+        // 2. Setting from mod_cv_settings or tbladdonmodules
+        $url = '';
+        if (function_exists('cv_setting')) {
+            $url = (string) cv_setting('license_server_url', '');
+        }
+        if (empty($url)) {
+            try {
+                $url = (string) Capsule::table('tbladdonmodules')
+                    ->where('module', 'clientverification')
+                    ->where('setting', 'license_server_url')
+                    ->value('value');
+            } catch (\Throwable $e) {}
+        }
+        if (!empty($url)) {
+            return rtrim($url, '/');
+        }
+
+        // 3. Auto-detect local development environment on localhost / 127.0.0.1
+        $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
+        if (str_contains($host, 'localhost') || str_contains($host, '127.0.0.1')) {
+            if (is_dir('C:/xampp/htdocs/license') || is_dir(dirname(__DIR__, 4) . '/license')) {
+                return 'http://localhost/license/public';
+            }
+        }
+
+        // 4. Default production license server
+        return self::DEFAULT_SERVER_URL;
+    }
+
+    /**
+     * Resolve Product Key from settings or default.
+     */
+    public function resolveProductKey(): string
+    {
+        $pk = '';
+        if (function_exists('cv_setting')) {
+            $pk = (string) cv_setting('license_product_key', '');
+        }
+        return !empty($pk) ? trim($pk) : self::DEFAULT_PRODUCT_KEY;
+    }
+
+    /**
+     * Resolve API Public Key.
+     */
+    public function resolveApiKey(): string
+    {
+        $key = '';
+        if (function_exists('cv_setting')) {
+            $key = (string) cv_setting('license_api_key', '');
+        }
+        return !empty($key) ? trim($key) : self::DEFAULT_API_KEY;
+    }
+
+    /**
+     * Resolve API Secret Key.
+     */
+    public function resolveApiSecret(): string
+    {
+        $secret = '';
+        if (function_exists('cv_setting')) {
+            $secret = (string) cv_setting('license_api_secret', '');
+        }
+        return !empty($secret) ? trim($secret) : self::DEFAULT_API_SECRET;
     }
 
     /**
@@ -401,6 +476,7 @@ class LicenseManager
             'ip'          => $ip,
             'last_check'  => $lastCheck > 0 ? date('Y-m-d H:i:s', $lastCheck) : 'Never',
             'message'     => $message,
+            'server_url'  => $this->serverUrl,
         ];
     }
 
@@ -431,6 +507,7 @@ class LicenseManager
 
         $respHeaders = [];
         $url = $this->serverUrl . $path;
+        $httpCode = 0;
 
         if (function_exists('curl_init')) {
             $ch = curl_init($url);
@@ -458,10 +535,11 @@ class LicenseManager
 
             $resp = curl_exec($ch);
             $err  = curl_error($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
             if ($resp === false) {
-                throw new \RuntimeException('cURL error connecting to server: ' . $err);
+                throw new \RuntimeException('cURL error connecting to ' . $url . ': ' . $err);
             }
         } else {
             $ctx = stream_context_create([
@@ -478,7 +556,7 @@ class LicenseManager
             ]);
             $resp = @file_get_contents($url, false, $ctx);
             if ($resp === false) {
-                throw new \RuntimeException('HTTP stream failed connecting to server');
+                throw new \RuntimeException('HTTP stream failed connecting to ' . $url);
             }
             if (isset($http_response_header)) {
                 foreach ($http_response_header as $line) {
@@ -507,7 +585,8 @@ class LicenseManager
 
         $decoded = json_decode((string)$resp, true);
         if (!is_array($decoded)) {
-            throw new \RuntimeException('Invalid JSON response from license server');
+            $cleanSnippet = substr(trim(strip_tags((string)$resp)), 0, 150);
+            throw new \RuntimeException("License server at {$url} returned HTTP {$httpCode} (Non-JSON): " . ($cleanSnippet ?: 'Empty response body'));
         }
 
         return $decoded;
