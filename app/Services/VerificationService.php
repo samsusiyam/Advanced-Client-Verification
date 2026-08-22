@@ -122,7 +122,9 @@ class VerificationService
                 Notifier::rejected($row->client_id, ['reason' => $note, 'note' => $note]);
                 OutboundWebhook::dispatch('verification.rejected', $verificationId);
             } elseif ($status === 'under_review') {
-                Notifier::reviewRequired($row->client_id);
+                if ($row->verification_method === 'manual') {
+                    Notifier::reviewRequired($row->client_id);
+                }
                 OutboundWebhook::dispatch('verification.review_required', $verificationId);
             } elseif ($status === 'expired') {
                 Notifier::expired($row->client_id);

@@ -133,7 +133,6 @@ class HybridVerificationService
                         'status' => 'in_progress',
                     ]);
                 $redirectUrl = $session->redirectUrl;
-                Notifier::started($clientId);
             } catch (\Exception $e) {
                 // Provider error -> fallback to manual document upload form
                 Capsule::table('mod_cv_verifications')
@@ -212,7 +211,7 @@ class HybridVerificationService
         }
 
         // Alert admin if high risk detected
-        if (($risk['level'] ?? '') === 'high') {
+        if (($risk['level'] ?? '') === 'high' && $decision === 'reject') {
             Notifier::adminHighRisk($verificationId, (int) $row->client_id, (float) ($risk['score'] ?? 0), (array) ($risk['reasons'] ?? []));
         }
 
@@ -226,26 +225,18 @@ class HybridVerificationService
                     return 'approved';
                 }
                 VerificationService::updateStatus($verificationId, 'under_review', 0, 'pending_admin_review');
-                if ($row->verification_method === 'didit') {
-                    Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, 'Under Review (Pending Approval)');
-                }
                 return 'review';
 
             case 'reject':
-                VerificationService::updateStatus($verificationId, 'rejected', 0, implode(',', $risk['flags']));
+                VerificationService::updateStatus($verificationId, 'rejected', 0, implode(', ', $risk['flags'] ?: ['verification_failed']));
                 if ($row->verification_method === 'didit') {
-                    Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, 'Rejected (' . implode(', ', $risk['flags']) . ')');
+                    Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, 'Rejected (' . implode(', ', $risk['flags'] ?: ['Failed']) . ')');
                 }
                 return 'rejected';
 
             case 'review':
             default:
-                VerificationService::updateStatus($verificationId, 'under_review', 0, implode(',', $risk['flags'] ?: ['review_required']));
-                if ($row->verification_method === 'didit') {
-                    $statusLabel = ($result->status === 'error') ? 'Under Review (Manual Inspection Required)' : 'Under Review';
-                    Notifier::adminDiditCompleted($verificationId, (int) $row->client_id, $statusLabel);
-                }
-                OutboundWebhookShim($verificationId);
+                VerificationService::updateStatus($verificationId, 'under_review', 0, implode(', ', $risk['flags'] ?: ['review_required']));
                 return 'review';
         }
     }
