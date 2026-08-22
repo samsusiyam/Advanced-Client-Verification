@@ -50,7 +50,9 @@ $statusParam = trim((string)($_GET['status'] ?? ''));
 
 if ($isGet || !empty($sessionId)) {
     $verificationId = null;
+    $loggedInClientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
 
+    // 1. Look up verification by exact didit_session_id
     if ($sessionId) {
         $vRow = Capsule::table('mod_cv_verifications')
             ->where('didit_session_id', $sessionId)
@@ -61,8 +63,10 @@ if ($isGet || !empty($sessionId)) {
         }
     }
 
-    if (!$verificationId) {
+    // 2. If not matched by session ID, check if currently logged-in client has an active verification
+    if (!$verificationId && $loggedInClientId > 0) {
         $vRow = Capsule::table('mod_cv_verifications')
+            ->where('client_id', $loggedInClientId)
             ->whereIn('status', ['pending', 'in_progress', 'under_review'])
             ->orderByDesc('id')
             ->first();
@@ -77,19 +81,14 @@ if ($isGet || !empty($sessionId)) {
         }
     }
 
-    $statusParam = trim((string)($_GET['status'] ?? ($_GET['decision'] ?? ($_GET['verification_status'] ?? ($_GET['didit_status'] ?? ($_GET['result'] ?? ''))))));
-
-    $isCallbackApproved = in_array(strtolower($statusParam), ['approved', 'verified', 'clear', 'passed', 'success', 'complete', 'completed', 'finished'], true);
-    $isCallbackDeclined = in_array(strtolower($statusParam), ['declined', 'rejected', 'failed', 'denied'], true);
-
-    if ($verificationId) {
+    // 3. Cryptographic / API status validation (Never trust forged GET parameters)
+    if ($verificationId && $sessionId) {
         $config = cv_get_config();
         $apiKey = $config['didit_api_key'] ?? ($config['api_key'] ?? '');
         $workflowId = $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? '');
 
         $result = null;
-
-        if ($apiKey && $workflowId && $sessionId) {
+        if ($apiKey && $workflowId) {
             try {
                 $provider = new \ClientVerification\Providers\DiditProvider(
                     $apiKey,
@@ -102,32 +101,18 @@ if ($isGet || !empty($sessionId)) {
             } catch (\Throwable $e) {}
         }
 
-        if ($result && $result->decision === \ClientVerification\Providers\KycResult::DECISION_APPROVED) {
+        // Apply result ONLY if verified directly from Didit API
+        if ($result && in_array($result->decision, [\ClientVerification\Providers\KycResult::DECISION_APPROVED, \ClientVerification\Providers\KycResult::DECISION_DECLINED, \ClientVerification\Providers\KycResult::DECISION_REVIEW], true)) {
             \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
-        } elseif ($isCallbackApproved) {
-            $cleanResult = new \ClientVerification\Providers\KycResult(
-                $sessionId ?: 'didit_cb_' . $verificationId,
-                'approved',
-                \ClientVerification\Providers\KycResult::DECISION_APPROVED,
-                0,
-                'low',
-                ['callback_status' => $statusParam ?: 'Approved', 'source' => 'browser_callback']
-            );
-            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $cleanResult);
-        } elseif ($result && $result->decision === \ClientVerification\Providers\KycResult::DECISION_DECLINED) {
-            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
-        } elseif ($isCallbackDeclined) {
-            $cleanResult = new \ClientVerification\Providers\KycResult(
-                $sessionId ?: 'didit_cb_' . $verificationId,
-                'rejected',
-                \ClientVerification\Providers\KycResult::DECISION_DECLINED,
-                80,
-                'high',
-                ['callback_status' => $statusParam ?: 'Declined', 'source' => 'browser_callback']
-            );
-            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $cleanResult);
-        } elseif ($result && $result->decision !== \ClientVerification\Providers\KycResult::DECISION_ERROR) {
-            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
+        } else {
+            // Leave in progress / under review until signed POST webhook arrives
+            Capsule::table('mod_cv_verifications')
+                ->where('id', $verificationId)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'in_progress',
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ]);
         }
     }
 

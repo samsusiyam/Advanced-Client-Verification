@@ -47,10 +47,17 @@ class LicenseManager
     /**
      * Fast check: returns true if the module currently has an active valid license.
      *
-     * @param bool $forceRemote Force remote verification against ELMS server
+     * In Admin Area: Defaults to true (0s real-time check).
+     * In Client Area / Checkout: Defaults to false (0ms fast cached check).
+     *
+     * @param bool|null $forceRemote
      */
-    public static function isLicensed(bool $forceRemote = true): bool
+    public static function isLicensed(?bool $forceRemote = null): bool
     {
+        if ($forceRemote === null) {
+            $isAdmin = defined('ADMINAREA') && ADMINAREA;
+            $forceRemote = $isAdmin;
+        }
         return self::getInstance()->checkLicenseValid($forceRemote);
     }
 
@@ -189,14 +196,20 @@ class LicenseManager
             return !empty($res['status']);
         }
 
-        // Fast path for non-admin client-side fallback
+        // Fast path for non-admin client-side checkout / notices
         $status = (string) cv_setting('license_status', 'unlicensed');
         if ($status !== 'active') {
             return false;
         }
 
         $cached = $this->readCache($key, $this->getDomain());
-        return ($cached !== null && !empty($cached['status']));
+        if ($cached !== null) {
+            return !empty($cached['status']);
+        }
+
+        // If cache is empty or expired, perform a live verification
+        $res = $this->verify(true);
+        return !empty($res['status']);
     }
 
     /**
