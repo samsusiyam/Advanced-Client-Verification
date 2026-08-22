@@ -95,12 +95,11 @@ class RiskEngine
             $reasons[] = 'Existing Approval: Client already has another active approved verification record (#' . $existingApproved->id . ')';
         }
 
-        // Provider error
+        // Provider error: network/API reachability is an infrastructure notice, not client fraud
         if ($result->decision === KycResult::DECISION_ERROR) {
             $flags[] = 'provider_error';
             $errDetail = $result->raw['error'] ?? ($result->raw['reason'] ?? 'Automated KYC provider returned an error or was unreachable');
-            $reasons[] = 'Provider Error: ' . $errDetail;
-            $score = max($score, 80);
+            $reasons[] = 'Provider Notice: ' . $errDetail;
         }
 
         if ($result->decision === KycResult::DECISION_DECLINED) {

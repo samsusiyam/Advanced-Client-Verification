@@ -6,8 +6,11 @@ use ClientVerification\Services\VerificationService;
 use Illuminate\Database\Capsule\Manager as Capsule;
 
 $clientId = (int) (($_SESSION['clientsdetails']['userid'] ?? 0) ?: ($_SESSION['uid'] ?? 0));
-$sessionId = trim((string)($_GET['verificationSessionId'] ?? ($_GET['session_id'] ?? ($_GET['verification_session_id'] ?? ''))));
-$statusParam = trim((string)($_GET['status'] ?? ''));
+$sessionId = trim((string)($_GET['verificationSessionId'] ?? ($_GET['session_id'] ?? ($_GET['verification_session_id'] ?? ($_GET['sessionId'] ?? ($_GET['id'] ?? ''))))));
+$statusParam = trim((string)($_GET['status'] ?? ($_GET['decision'] ?? ($_GET['verification_status'] ?? ($_GET['didit_status'] ?? ($_GET['result'] ?? ''))))));
+
+$isCallbackApproved = in_array(strtolower($statusParam), ['approved', 'verified', 'clear', 'passed', 'success', 'complete', 'completed', 'finished'], true);
+$isCallbackDeclined = in_array(strtolower($statusParam), ['declined', 'rejected', 'failed', 'denied'], true);
 
 $verificationId = null;
 
@@ -38,12 +41,14 @@ if (!$verificationId && $clientId > 0) {
     }
 }
 
-if ($verificationId && $sessionId) {
+if ($verificationId) {
     $config = cv_get_config();
     $apiKey = $config['didit_api_key'] ?? ($config['api_key'] ?? '');
     $workflowId = $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? '');
 
-    if ($apiKey && $workflowId) {
+    $result = null;
+
+    if ($apiKey && $workflowId && $sessionId) {
         try {
             $provider = new DiditProvider(
                 $apiKey,
@@ -53,25 +58,35 @@ if ($verificationId && $sessionId) {
             );
 
             $result = $provider->getStatus($sessionId);
-            if ($result->status === 'error' && strcasecmp($statusParam, 'Approved') === 0) {
-                $result = new \ClientVerification\Providers\KycResult(
-                    $sessionId,
-                    'approved',
-                    \ClientVerification\Providers\KycResult::DECISION_APPROVED,
-                    0,
-                    'low',
-                    ['callback_status' => 'Approved']
-                );
-            }
+        } catch (\Throwable $e) {}
+    }
 
-            HybridVerificationService::applyResult($verificationId, $result);
-        } catch (\Throwable $e) {
-            if (strcasecmp($statusParam, 'Approved') === 0) {
-                VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_callback_approved');
-            }
-        }
-    } elseif (strcasecmp($statusParam, 'Approved') === 0) {
-        VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_callback_approved');
+    if ($result && $result->decision === \ClientVerification\Providers\KycResult::DECISION_APPROVED) {
+        HybridVerificationService::applyResult($verificationId, $result);
+    } elseif ($isCallbackApproved) {
+        $cleanResult = new \ClientVerification\Providers\KycResult(
+            $sessionId ?: 'didit_cb_' . $verificationId,
+            'approved',
+            \ClientVerification\Providers\KycResult::DECISION_APPROVED,
+            0,
+            'low',
+            ['callback_status' => $statusParam ?: 'Approved', 'source' => 'browser_callback']
+        );
+        HybridVerificationService::applyResult($verificationId, $cleanResult);
+    } elseif ($result && $result->decision === \ClientVerification\Providers\KycResult::DECISION_DECLINED) {
+        HybridVerificationService::applyResult($verificationId, $result);
+    } elseif ($isCallbackDeclined) {
+        $cleanResult = new \ClientVerification\Providers\KycResult(
+            $sessionId ?: 'didit_cb_' . $verificationId,
+            'rejected',
+            \ClientVerification\Providers\KycResult::DECISION_DECLINED,
+            80,
+            'high',
+            ['callback_status' => $statusParam ?: 'Declined', 'source' => 'browser_callback']
+        );
+        HybridVerificationService::applyResult($verificationId, $cleanResult);
+    } elseif ($result && $result->decision !== \ClientVerification\Providers\KycResult::DECISION_ERROR) {
+        HybridVerificationService::applyResult($verificationId, $result);
     }
 }
 

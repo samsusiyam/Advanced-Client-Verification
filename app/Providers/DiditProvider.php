@@ -107,30 +107,50 @@ class DiditProvider implements KycProviderInterface
             'Accept: application/json',
         ];
 
-        // 1. Try Didit v3 session decision endpoint
-        $response = Http::get(
+        $urls = [
             $this->baseUrl . '/v3/session/' . rawurlencode($sessionId) . '/decision/',
-            $headers
-        );
+            $this->baseUrl . '/v3/session/' . rawurlencode($sessionId) . '/decision',
+            $this->baseUrl . '/v3/session/' . rawurlencode($sessionId) . '/',
+            $this->baseUrl . '/v3/session/' . rawurlencode($sessionId),
+            $this->baseUrl . '/v2/session/' . rawurlencode($sessionId) . '/decision/',
+            $this->baseUrl . '/v2/session/' . rawurlencode($sessionId) . '/decision',
+            $this->baseUrl . '/v2/session/' . rawurlencode($sessionId),
+            $this->baseUrl . '/v1/session/' . rawurlencode($sessionId) . '/decision',
+            $this->baseUrl . '/v1/session/' . rawurlencode($sessionId),
+        ];
 
-        // 2. Try Didit v3 session endpoint
-        if (!$response['success']) {
-            $response = Http::get(
-                $this->baseUrl . '/v3/session/' . rawurlencode($sessionId) . '/',
-                $headers
-            );
+        $response = null;
+        $lastError = '';
+
+        foreach ($urls as $url) {
+            $res = Http::get($url, $headers);
+            if ($res['success'] && !empty($res['data'])) {
+                $response = $res;
+                break;
+            }
+            if (!empty($res['error'])) {
+                $lastError = $res['error'];
+            }
         }
 
-        // 3. Try Didit v2 session endpoint
-        if (!$response['success']) {
-            $response = Http::get(
-                $this->baseUrl . '/v2/session/' . rawurlencode($sessionId),
-                $headers
-            );
+        if (!$response || !$response['success']) {
+            if (strpos($this->baseUrl, 'verification.didit.me') !== false) {
+                $altUrls = [
+                    'https://api.didit.me/v3/session/' . rawurlencode($sessionId) . '/decision/',
+                    'https://api.didit.me/v3/session/' . rawurlencode($sessionId),
+                ];
+                foreach ($altUrls as $url) {
+                    $res = Http::get($url, $headers);
+                    if ($res['success'] && !empty($res['data'])) {
+                        $response = $res;
+                        break;
+                    }
+                }
+            }
         }
 
-        if (!$response['success']) {
-            return new KycResult($sessionId, 'error', KycResult::DECISION_ERROR, 0, 'low', ['error' => $response['error']]);
+        if (!$response || !$response['success']) {
+            return new KycResult($sessionId, 'error', KycResult::DECISION_ERROR, 0, 'low', ['error' => $lastError ?: 'Could not reach Didit status endpoint']);
         }
 
         return $this->normalize($response['data']);
@@ -237,14 +257,66 @@ class DiditProvider implements KycProviderInterface
         $sessionId = (string) ($data['session_id'] ?? ($data['id'] ?? ''));
         
         $rawStatus = '';
-        if (isset($data['status']) && is_string($data['status'])) {
-            $rawStatus = $data['status'];
-        } elseif (isset($data['decision']) && is_string($data['decision'])) {
-            $rawStatus = $data['decision'];
-        } elseif (isset($data['decision']) && is_array($data['decision'])) {
-            $rawStatus = (string) ($data['decision']['status'] ?? ($data['decision']['decision'] ?? 'pending'));
-        } elseif (isset($data['session_status']) && is_string($data['session_status'])) {
-            $rawStatus = $data['session_status'];
+
+        // 1. Check nested decision object / string (most specific outcome in Didit v3)
+        if (isset($data['decision'])) {
+            if (is_array($data['decision'])) {
+                $rawStatus = (string) ($data['decision']['status'] ?? ($data['decision']['decision'] ?? ''));
+            } elseif (is_string($data['decision'])) {
+                $rawStatus = $data['decision'];
+            }
+        }
+
+        // 2. Check top-level status if decision was not conclusive
+        if (empty($rawStatus) || in_array(strtolower($rawStatus), ['pending', 'in_progress', 'completed', 'finished', 'submitted'], true)) {
+            if (!empty($data['status']) && is_string($data['status'])) {
+                $topStatus = $data['status'];
+                if (in_array(strtolower($topStatus), ['approved', 'declined', 'rejected', 'failed', 'expired', 'clear', 'verified', 'passed'], true)) {
+                    $rawStatus = $topStatus;
+                } elseif (empty($rawStatus)) {
+                    $rawStatus = $topStatus;
+                }
+            } elseif (!empty($data['session_status']) && is_string($data['session_status'])) {
+                $topStatus = $data['session_status'];
+                if (in_array(strtolower($topStatus), ['approved', 'declined', 'rejected', 'failed', 'expired', 'clear', 'verified', 'passed'], true)) {
+                    $rawStatus = $topStatus;
+                } elseif (empty($rawStatus)) {
+                    $rawStatus = $topStatus;
+                }
+            } elseif (!empty($data['verification_status']) && is_string($data['verification_status'])) {
+                $rawStatus = $data['verification_status'];
+            }
+        }
+
+        // 3. If top level is Completed / Finished and no decline, check if all verifications passed
+        if (in_array(strtolower($rawStatus), ['completed', 'finished', 'submitted'], true)) {
+            $hasFailure = false;
+            $hasSuccess = false;
+            if (!empty($data['id_verifications']) && is_array($data['id_verifications'])) {
+                foreach ($data['id_verifications'] as $idv) {
+                    if (isset($idv['status']) && in_array(strtolower((string)$idv['status']), ['approved', 'passed', 'clear', 'verified'], true)) {
+                        $hasSuccess = true;
+                    }
+                    if (isset($idv['status']) && in_array(strtolower((string)$idv['status']), ['declined', 'rejected', 'failed'], true)) {
+                        $hasFailure = true;
+                    }
+                }
+            }
+            if (!empty($data['face_matches']) && is_array($data['face_matches'])) {
+                foreach ($data['face_matches'] as $fm) {
+                    if (isset($fm['matched']) && $fm['matched'] === true) {
+                        $hasSuccess = true;
+                    }
+                    if (isset($fm['matched']) && $fm['matched'] === false) {
+                        $hasFailure = true;
+                    }
+                }
+            }
+            if ($hasSuccess && !$hasFailure) {
+                $rawStatus = 'Approved';
+            } elseif ($hasFailure) {
+                $rawStatus = 'Declined';
+            }
         }
 
         $statusLower = strtolower(trim((string) $rawStatus));
@@ -256,6 +328,9 @@ class DiditProvider implements KycProviderInterface
             case 'success':
             case 'passed':
             case 'verified':
+            case 'complete':
+            case 'completed':
+            case 'finished':
                 $decision = KycResult::DECISION_APPROVED;
                 $statusLower = 'approved';
                 break;
@@ -274,6 +349,7 @@ class DiditProvider implements KycProviderInterface
             case 'in_progress':
             case 'resubmitted':
             case 'not started':
+            case 'submitted':
                 $decision = KycResult::DECISION_REVIEW;
                 break;
             case 'expired':

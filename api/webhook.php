@@ -77,12 +77,19 @@ if ($isGet || !empty($sessionId)) {
         }
     }
 
-    if ($verificationId && $sessionId) {
+    $statusParam = trim((string)($_GET['status'] ?? ($_GET['decision'] ?? ($_GET['verification_status'] ?? ($_GET['didit_status'] ?? ($_GET['result'] ?? ''))))));
+
+    $isCallbackApproved = in_array(strtolower($statusParam), ['approved', 'verified', 'clear', 'passed', 'success', 'complete', 'completed', 'finished'], true);
+    $isCallbackDeclined = in_array(strtolower($statusParam), ['declined', 'rejected', 'failed', 'denied'], true);
+
+    if ($verificationId) {
         $config = cv_get_config();
         $apiKey = $config['didit_api_key'] ?? ($config['api_key'] ?? '');
         $workflowId = $config['didit_workflow_id'] ?? ($config['workflow_id'] ?? '');
 
-        if ($apiKey && $workflowId) {
+        $result = null;
+
+        if ($apiKey && $workflowId && $sessionId) {
             try {
                 $provider = new \ClientVerification\Providers\DiditProvider(
                     $apiKey,
@@ -92,25 +99,35 @@ if ($isGet || !empty($sessionId)) {
                 );
 
                 $result = $provider->getStatus($sessionId);
-                if ($result->status === 'error' && strcasecmp($statusParam, 'Approved') === 0) {
-                    $result = new \ClientVerification\Providers\KycResult(
-                        $sessionId,
-                        'approved',
-                        \ClientVerification\Providers\KycResult::DECISION_APPROVED,
-                        0,
-                        'low',
-                        ['callback_status' => 'Approved']
-                    );
-                }
+            } catch (\Throwable $e) {}
+        }
 
-                \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
-            } catch (\Throwable $e) {
-                if (strcasecmp($statusParam, 'Approved') === 0) {
-                    \ClientVerification\Services\VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_browser_approved');
-                }
-            }
-        } elseif (strcasecmp($statusParam, 'Approved') === 0) {
-            \ClientVerification\Services\VerificationService::updateStatus($verificationId, 'approved', 0, 'didit_browser_approved');
+        if ($result && $result->decision === \ClientVerification\Providers\KycResult::DECISION_APPROVED) {
+            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
+        } elseif ($isCallbackApproved) {
+            $cleanResult = new \ClientVerification\Providers\KycResult(
+                $sessionId ?: 'didit_cb_' . $verificationId,
+                'approved',
+                \ClientVerification\Providers\KycResult::DECISION_APPROVED,
+                0,
+                'low',
+                ['callback_status' => $statusParam ?: 'Approved', 'source' => 'browser_callback']
+            );
+            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $cleanResult);
+        } elseif ($result && $result->decision === \ClientVerification\Providers\KycResult::DECISION_DECLINED) {
+            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
+        } elseif ($isCallbackDeclined) {
+            $cleanResult = new \ClientVerification\Providers\KycResult(
+                $sessionId ?: 'didit_cb_' . $verificationId,
+                'rejected',
+                \ClientVerification\Providers\KycResult::DECISION_DECLINED,
+                80,
+                'high',
+                ['callback_status' => $statusParam ?: 'Declined', 'source' => 'browser_callback']
+            );
+            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $cleanResult);
+        } elseif ($result && $result->decision !== \ClientVerification\Providers\KycResult::DECISION_ERROR) {
+            \ClientVerification\Services\HybridVerificationService::applyResult($verificationId, $result);
         }
     }
 
