@@ -1,36 +1,56 @@
 {
     "schema": "1.0",
     "type": "whmcs-addon",
-    "name": "clientverification",
+    "module": "clientverification",
+    "name": "Advanced Client Verification",
     "displayName": "Advanced Client Verification",
-    "description": {
-        "headline": "Enterprise-grade automated and manual KYC verification module by HostNibo.",
-        "features": [
-            "Biometric automated KYC verification with Didit integration",
-            "Manual government-issued ID and document review workflow",
-            "Hybrid verification modes with automatic fallback",
-            "Custom KYC product rules, categories, and client group enforcement",
-            "Risk evaluation and duplicate document detection",
-            "Private AES-256 encrypted document storage outside the web root",
-            "Multi-channel email notifications and configurable admin routing",
-            "HMAC-secured inbound and outbound webhooks",
-            "Complete verification audit timeline and compliance logging"
-        ]
-    },
+    "display_name": "Advanced Client Verification",
+    "title": "Advanced Client Verification",
+    "description": "Enterprise-grade automated and manual KYC verification module for WHMCS by HostNibo.",
+    "headline": "Enterprise-grade automated and manual KYC verification module by HostNibo.",
+    "summary": "Enterprise-grade automated and manual KYC verification module by HostNibo.",
+    "category": "Security",
+    "categories": [
+        "Security",
+        "Compliance",
+        "Authentication"
+    ],
     "version": "1.0.0",
+    "developer": {
+        "name": "HostNibo",
+        "url": "https://hostnibo.com",
+        "supportUrl": "https://siyam.bio.link"
+    },
     "author": {
         "name": "HostNibo",
         "homepage": "https://hostnibo.com",
+        "url": "https://hostnibo.com",
         "supportUrl": "https://siyam.bio.link"
     },
+    "developer_name": "HostNibo",
+    "author_name": "HostNibo",
     "homepage": "https://hostnibo.com",
     "support": {
         "url": "https://siyam.bio.link",
         "email": "support@hostnibo.com"
     },
+    "support_url": "https://siyam.bio.link",
+    "support_email": "support@hostnibo.com",
     "logo": {
         "filename": "logo.png"
     },
+    "icon": "logo.png",
+    "features": [
+        "Biometric automated KYC verification with Didit integration",
+        "Manual government-issued ID and document review workflow",
+        "Hybrid verification modes with automatic fallback",
+        "Custom KYC product rules, categories, and client group enforcement",
+        "Risk evaluation and duplicate document detection",
+        "Private AES-256 encrypted document storage outside the web root",
+        "Multi-channel email notifications and configurable admin routing",
+        "HMAC-secured inbound and outbound webhooks",
+        "Complete verification audit timeline and compliance logging"
+    ],
     "license": "MIT",
     "minimumPhpVersion": "8.1",
     "maximumPhpVersion": "8.4",

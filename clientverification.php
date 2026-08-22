@@ -13,9 +13,11 @@ function clientverification_config()
 {
     return [
         'name' => 'Advanced Client Verification',
-        'description' => 'Enterprise-grade automated & manual KYC verification module by HostNibo. Supports AI Biometrics (Didit), manual ID review, flexible product & group rules, multi-channel email alerts, and audit logging. Support: https://siyam.bio.link',
+        'displayName' => 'Advanced Client Verification',
+        'description' => 'Enterprise-grade automated and manual KYC verification module for WHMCS by HostNibo.',
         'version' => '1.0.0',
         'author' => 'HostNibo',
+        'category' => 'Security',
         'language' => 'english',
         'fields' => [],
     ];
