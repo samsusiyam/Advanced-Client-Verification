@@ -51,26 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $errorMessage = 'Update check failed: ' . ($res['message'] ?? 'Server unreachable');
         }
-    } elseif (isset($_POST['cv_save_license_settings'])) {
-        $srv = trim($_POST['license_server_url'] ?? '');
-        $pk  = trim($_POST['license_product_key'] ?? '');
-        $ak  = trim($_POST['license_api_key'] ?? '');
-        $sk  = trim($_POST['license_api_secret'] ?? '');
-
-        if (!empty($srv)) {
-            cv_setting_set('license_server_url', rtrim($srv, '/'));
-        }
-        if (!empty($pk)) {
-            cv_setting_set('license_product_key', $pk);
-        }
-        if (!empty($ak)) {
-            cv_setting_set('license_api_key', $ak);
-        }
-        if (!empty($sk)) {
-            cv_setting_set('license_api_secret', $sk);
-        }
-
-        $successMessage = 'License server connection settings updated successfully.';
     }
 }
 
@@ -119,7 +99,7 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
                 </div>
                 <p style="margin: 4px 0 0 0; color: <?php echo $isLicensed ? '#166534' : '#9a3412'; ?>; font-size: 13px;">
                     <?php if ($isLicensed): ?>
-                        Your module is licensed, verified, and protected by HostNibo External License Management System.
+                        Your module is licensed, verified, and active.
                     <?php else: ?>
                         Enter your valid license key below to unlock automated KYC verification and client management.
                     <?php endif; ?>
@@ -184,38 +164,9 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
 
             <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Product Key</div>
-                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">
-                        <?php echo htmlspecialchars($details['product_key']); ?>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
                     <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Expiry Date</div>
                     <div style="font-size: 13px; font-weight: 600; color: <?php echo $details['expiry_date'] === 'Lifetime / Ongoing' ? '#16a34a' : '#0f172a'; ?>;">
                         <i class="fa fa-calendar"></i> <?php echo htmlspecialchars($details['expiry_date']); ?>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Last Verified</div>
-                    <div style="font-size: 13px; font-weight: 600; color: #0f172a;">
-                        <i class="fa fa-clock-o"></i> <?php echo htmlspecialchars($details['last_check']); ?>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">License Server</div>
-                    <div style="font-size: 13px; font-weight: 600; color: #2563eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                        <a href="<?php echo htmlspecialchars($details['server_url']); ?>" target="_blank" style="color: #2563eb; text-decoration: none;">
-                            <?php echo htmlspecialchars($details['server_url']); ?>
-                        </a>
                     </div>
                 </div>
             </div>
@@ -285,57 +236,6 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
     </div>
 </div>
 
-<!-- Advanced Connection Settings (Collapsible) -->
-<div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); margin-bottom: 24px; overflow: hidden;">
-    <div style="padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; cursor: pointer; display: flex; justify-content: space-between; align-items: center;" onclick="toggleAdvancedSettings()">
-        <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 8px;">
-            <i class="fa fa-cog"></i> Advanced License Server Settings
-        </h4>
-        <span id="cv-adv-toggle-icon" style="color: #64748b;"><i class="fa fa-chevron-down"></i></span>
-    </div>
-
-    <div id="cv-advanced-settings-body" style="padding: 20px; display: none;">
-        <form method="POST">
-            <?php echo Csrf::field(); ?>
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label style="font-weight: 600; font-size: 13px;">License Server Base URL</label>
-                        <input type="text" name="license_server_url" class="form-control" value="<?php echo htmlspecialchars($details['server_url']); ?>" placeholder="https://lic.hostnibo.com">
-                        <small class="text-muted">The root URL of your HostNibo ELMS License Server (without trailing slash).</small>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label style="font-weight: 600; font-size: 13px;">Product Key Identifier</label>
-                        <input type="text" name="license_product_key" class="form-control" value="<?php echo htmlspecialchars($details['product_key']); ?>" placeholder="ADVANCED-CLIENT-VERIFICATION">
-                        <small class="text-muted">Matches the Product Key on the ELMS server.</small>
-                    </div>
-                </div>
-            </div>
-            <div class="row" style="margin-top: 10px;">
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label style="font-weight: 600; font-size: 13px;">API Public Key (Optional override)</label>
-                        <input type="text" name="license_api_key" class="form-control" value="<?php echo htmlspecialchars($licenseManager->resolveApiKey()); ?>">
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="form-group">
-                        <label style="font-weight: 600; font-size: 13px;">API Secret Key (Optional override)</label>
-                        <input type="password" name="license_api_secret" class="form-control" value="<?php echo htmlspecialchars($licenseManager->resolveApiSecret()); ?>">
-                    </div>
-                </div>
-            </div>
-            <div style="margin-top: 14px;">
-                <button type="submit" name="cv_save_license_settings" value="1" class="btn btn-default btn-sm" style="font-weight: 600;">
-                    <i class="fa fa-save"></i> Save Server Settings
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <script>
 var isFullKeyShown = false;
 var fullKey = <?php echo json_encode($details['license_key']); ?>;
@@ -353,19 +253,6 @@ function toggleLicKey() {
         elem.textContent = fullKey;
         if (icon) icon.className = 'fa fa-eye-slash';
         isFullKeyShown = true;
-    }
-}
-
-function toggleAdvancedSettings() {
-    var body = document.getElementById('cv-advanced-settings-body');
-    var icon = document.getElementById('cv-adv-toggle-icon');
-    if (!body) return;
-    if (body.style.display === 'none') {
-        body.style.display = 'block';
-        if (icon) icon.innerHTML = '<i class="fa fa-chevron-up"></i>';
-    } else {
-        body.style.display = 'none';
-        if (icon) icon.innerHTML = '<i class="fa fa-chevron-down"></i>';
     }
 }
 </script>

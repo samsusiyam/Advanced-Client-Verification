@@ -10,13 +10,6 @@ use Illuminate\Database\Capsule\Manager as Capsule;
  * Integrates HostNibo's External License Management System (ELMS)
  * with the Advanced Client Verification module.
  *
- * Provides:
- *  - Cryptographically signed HMAC-SHA256 API client
- *  - Tamper-proof offline response caching (12h TTL)
- *  - Instant license verification, activation, deactivation
- *  - Automated update check & release notification
- *  - Fail-safe store fallback so customer checkouts are never broken
- *
  * @package ClientVerification\License
  * @author  HostNibo
  */
@@ -36,12 +29,15 @@ class LicenseManager
     private string $apiSecret;
     private string $cacheDir;
 
-    public function __construct(?string $serverUrl = null, ?string $productKey = null, ?string $apiKey = null, ?string $apiSecret = null)
+    private ?string $lastResponseSig = null;
+    private ?int $lastResponseTs = null;
+
+    public function __construct()
     {
-        $this->serverUrl  = rtrim($serverUrl ?: $this->resolveServerUrl(), '/');
-        $this->productKey = $productKey ?: $this->resolveProductKey();
-        $this->apiKey     = $apiKey ?: $this->resolveApiKey();
-        $this->apiSecret  = $apiSecret ?: $this->resolveApiSecret();
+        $this->serverUrl  = self::DEFAULT_SERVER_URL;
+        $this->productKey = self::DEFAULT_PRODUCT_KEY;
+        $this->apiKey     = self::DEFAULT_API_KEY;
+        $this->apiSecret  = self::DEFAULT_API_SECRET;
         $this->cacheDir   = dirname(__DIR__, 2) . '/storage/license';
 
         if (!is_dir($this->cacheDir)) {
@@ -63,62 +59,6 @@ class LicenseManager
     public static function isLicensed(): bool
     {
         return self::getInstance()->checkLicenseValid();
-    }
-
-    /**
-     * Resolve Server URL from settings or default.
-     */
-    public function resolveServerUrl(): string
-    {
-        $url = '';
-        if (function_exists('cv_setting')) {
-            $url = (string) cv_setting('license_server_url', '');
-        }
-        if (empty($url)) {
-            try {
-                $url = (string) Capsule::table('tbladdonmodules')
-                    ->where('module', 'clientverification')
-                    ->where('setting', 'license_server_url')
-                    ->value('value');
-            } catch (\Throwable $e) {}
-        }
-        return !empty($url) ? rtrim($url, '/') : self::DEFAULT_SERVER_URL;
-    }
-
-    /**
-     * Resolve Product Key from settings or default.
-     */
-    public function resolveProductKey(): string
-    {
-        $pk = '';
-        if (function_exists('cv_setting')) {
-            $pk = (string) cv_setting('license_product_key', '');
-        }
-        return !empty($pk) ? trim($pk) : self::DEFAULT_PRODUCT_KEY;
-    }
-
-    /**
-     * Resolve API Public Key.
-     */
-    public function resolveApiKey(): string
-    {
-        $key = '';
-        if (function_exists('cv_setting')) {
-            $key = (string) cv_setting('license_api_key', '');
-        }
-        return !empty($key) ? trim($key) : self::DEFAULT_API_KEY;
-    }
-
-    /**
-     * Resolve API Secret Key.
-     */
-    public function resolveApiSecret(): string
-    {
-        $secret = '';
-        if (function_exists('cv_setting')) {
-            $secret = (string) cv_setting('license_api_secret', '');
-        }
-        return !empty($secret) ? trim($secret) : self::DEFAULT_API_SECRET;
     }
 
     /**
@@ -427,40 +367,7 @@ class LicenseManager
     }
 
     /**
-     * Test connection and latency to the ELMS server.
-     *
-     * @return array{status:bool,message:string,latency_ms:float,server_url:string}
-     */
-    public function testConnection(): array
-    {
-        $start = microtime(true);
-        try {
-            $res = $this->post('/api/license/verify', [
-                'license_key' => 'TEST-PROBE-' . time(),
-                'domain'      => 'probe.local',
-                'product'     => $this->productKey,
-            ]);
-            $latency = round((microtime(true) - $start) * 1000, 2);
-
-            return [
-                'status'     => true,
-                'message'    => 'Connection established! Server is online and HMAC-SHA256 handshake succeeded.',
-                'latency_ms' => $latency,
-                'server_url' => $this->serverUrl,
-            ];
-        } catch (\Throwable $e) {
-            $latency = round((microtime(true) - $start) * 1000, 2);
-            return [
-                'status'     => false,
-                'message'    => $e->getMessage(),
-                'latency_ms' => $latency,
-                'server_url' => $this->serverUrl,
-            ];
-        }
-    }
-
-    /**
-     * Returns full license details and diagnostics for the admin panel.
+     * Returns license details for the admin panel.
      *
      * @return array<string,mixed>
      */
@@ -485,26 +392,21 @@ class LicenseManager
         }
 
         return [
-            'license_key'   => $key,
-            'masked_key'    => $maskedKey,
-            'status'        => $status ?: 'unlicensed',
-            'is_licensed'   => ($status === 'active'),
-            'expiry_date'   => $expiry ?: 'Lifetime / Ongoing',
-            'domain'        => $domain,
-            'ip'            => $ip,
-            'product_key'   => $this->productKey,
-            'server_url'    => $this->serverUrl,
-            'last_check'    => $lastCheck > 0 ? date('Y-m-d H:i:s', $lastCheck) : 'Never',
-            'message'       => $message,
+            'license_key' => $key,
+            'masked_key'  => $maskedKey,
+            'status'      => $status ?: 'unlicensed',
+            'is_licensed' => ($status === 'active'),
+            'expiry_date' => $expiry ?: 'Lifetime / Ongoing',
+            'domain'      => $domain,
+            'ip'          => $ip,
+            'last_check'  => $lastCheck > 0 ? date('Y-m-d H:i:s', $lastCheck) : 'Never',
+            'message'     => $message,
         ];
     }
 
     // -------------------------------------------------------------------------
     // Cryptographic Signed HTTP Transport
     // -------------------------------------------------------------------------
-
-    private ?string $lastResponseSig = null;
-    private ?int $lastResponseTs = null;
 
     /**
      * Send HMAC-SHA256 signed POST request to the ELMS license server.
@@ -556,11 +458,10 @@ class LicenseManager
 
             $resp = curl_exec($ch);
             $err  = curl_error($ch);
-            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
             if ($resp === false) {
-                throw new \RuntimeException('cURL error connecting to ' . $url . ': ' . $err);
+                throw new \RuntimeException('cURL error connecting to server: ' . $err);
             }
         } else {
             $ctx = stream_context_create([
@@ -577,7 +478,7 @@ class LicenseManager
             ]);
             $resp = @file_get_contents($url, false, $ctx);
             if ($resp === false) {
-                throw new \RuntimeException('HTTP stream failed connecting to ' . $url);
+                throw new \RuntimeException('HTTP stream failed connecting to server');
             }
             if (isset($http_response_header)) {
                 foreach ($http_response_header as $line) {

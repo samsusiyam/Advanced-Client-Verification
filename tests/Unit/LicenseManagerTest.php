@@ -7,13 +7,6 @@ use ClientVerification\License\LicenseManager;
 
 class LicenseManagerTest extends TestCase
 {
-    public function testDefaultValues()
-    {
-        $manager = new LicenseManager('https://lic.hostnibo.com', 'ADVANCED-CLIENT-VERIFICATION');
-        $this->assertSame('https://lic.hostnibo.com', $manager->resolveServerUrl());
-        $this->assertSame('ADVANCED-CLIENT-VERIFICATION', $manager->resolveProductKey());
-    }
-
     public function testDomainAndIpDetection()
     {
         $_SERVER['HTTP_HOST'] = 'demo.hostnibo.com:443';
@@ -30,7 +23,7 @@ class LicenseManagerTest extends TestCase
         $this->assertArrayHasKey('status', $details);
         $this->assertArrayHasKey('is_licensed', $details);
         $this->assertArrayHasKey('domain', $details);
-        $this->assertArrayHasKey('product_key', $details);
-        $this->assertArrayHasKey('server_url', $details);
+        $this->assertArrayHasKey('ip', $details);
+        $this->assertArrayHasKey('expiry_date', $details);
     }
 }
