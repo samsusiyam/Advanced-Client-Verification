@@ -4,17 +4,17 @@
     "name": "clientverification",
     "displayName": "Advanced Client Verification",
     "description": {
-        "headline": "Enterprise-grade automated & manual KYC verification module by HostNibo.",
+        "headline": "Enterprise-grade automated and manual KYC verification module by HostNibo.",
         "features": [
             "Biometric automated KYC verification with Didit integration",
             "Manual government-issued ID and document review workflow",
-            "Hybrid verification modes with seamless automatic fallback",
+            "Hybrid verification modes with automatic fallback",
             "Custom KYC product rules, categories, and client group enforcement",
-            "Risk evaluation and duplicate document detection engine",
-            "Private AES-256 encrypted document storage outside web root",
-            "Multi-channel email notifications and custom admin routing",
+            "Risk evaluation and duplicate document detection",
+            "Private AES-256 encrypted document storage outside the web root",
+            "Multi-channel email notifications and configurable admin routing",
             "HMAC-secured inbound and outbound webhooks",
-            "Full audit timeline and compliance logging"
+            "Complete verification audit timeline and compliance logging"
         ]
     },
     "version": "1.0.0",
