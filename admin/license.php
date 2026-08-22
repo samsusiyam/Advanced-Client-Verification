@@ -180,14 +180,6 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
                     <i class="fa fa-refresh"></i> Re-verify
                 </button>
             </form>
-            <?php if ($isLicensed): ?>
-                <form method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to deactivate this license? This will free the activation slot on the license server.');">
-                    <?php echo Csrf::field(); ?>
-                    <button type="submit" name="cv_deactivate_license" value="1" class="btn btn-danger btn-sm" style="font-weight: 600;">
-                        <i class="fa fa-power-off"></i> Deactivate
-                    </button>
-                </form>
-            <?php endif; ?>
         </div>
     </div>
 
