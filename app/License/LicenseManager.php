@@ -22,6 +22,7 @@ class LicenseManager
     public const CACHE_TTL_SECONDS    = 43200; // 12 hours
 
     private static ?self $instance = null;
+    private static ?array $cachedLocalElmsKey = null;
 
     private string $serverUrl;
     private string $productKey;
@@ -117,11 +118,24 @@ class LicenseManager
      */
     public function resolveApiKey(): string
     {
+        if (defined('CV_LICENSE_API_KEY') && !empty(constant('CV_LICENSE_API_KEY'))) {
+            return trim(constant('CV_LICENSE_API_KEY'));
+        }
         $key = '';
         if (function_exists('cv_setting')) {
             $key = (string) cv_setting('license_api_key', '');
         }
-        return !empty($key) ? trim($key) : self::DEFAULT_API_KEY;
+        if (!empty($key)) {
+            return trim($key);
+        }
+
+        // Auto-detect local active API key from local ELMS database
+        $localKey = $this->getLocalElmsApiKey();
+        if (!empty($localKey['api_key'])) {
+            return $localKey['api_key'];
+        }
+
+        return self::DEFAULT_API_KEY;
     }
 
     /**
@@ -129,11 +143,84 @@ class LicenseManager
      */
     public function resolveApiSecret(): string
     {
+        if (defined('CV_LICENSE_API_SECRET') && !empty(constant('CV_LICENSE_API_SECRET'))) {
+            return trim(constant('CV_LICENSE_API_SECRET'));
+        }
         $secret = '';
         if (function_exists('cv_setting')) {
             $secret = (string) cv_setting('license_api_secret', '');
         }
-        return !empty($secret) ? trim($secret) : self::DEFAULT_API_SECRET;
+        if (!empty($secret)) {
+            return trim($secret);
+        }
+
+        // Auto-detect local active API secret from local ELMS database
+        $localKey = $this->getLocalElmsApiKey();
+        if (!empty($localKey['secret_key'])) {
+            return $localKey['secret_key'];
+        }
+
+        return self::DEFAULT_API_SECRET;
+    }
+
+    /**
+     * Read active API key and secret directly from local ELMS server when testing on localhost.
+     */
+    private function getLocalElmsApiKey(): ?array
+    {
+        if (self::$cachedLocalElmsKey !== null) {
+            return self::$cachedLocalElmsKey;
+        }
+
+        $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
+        if (!str_contains($host, 'localhost') && !str_contains($host, '127.0.0.1')) {
+            return null;
+        }
+
+        $elmsPath = 'C:/xampp/htdocs/license';
+        if (!is_dir($elmsPath)) {
+            $parentPath = dirname(__DIR__, 4) . '/license';
+            if (is_dir($parentPath)) {
+                $elmsPath = $parentPath;
+            } else {
+                return null;
+            }
+        }
+
+        if (!file_exists($elmsPath . '/.env')) {
+            return null;
+        }
+
+        try {
+            $envLines = file($elmsPath . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $env = [];
+            foreach ($envLines as $line) {
+                if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) {
+                    continue;
+                }
+                [$k, $v] = explode('=', $line, 2);
+                $env[trim($k)] = trim(trim($v), '"\'');
+            }
+
+            $dbHost = $env['DB_HOST'] ?? '127.0.0.1';
+            $dbPort = $env['DB_PORT'] ?? '3306';
+            $dbName = $env['DB_NAME'] ?? 'elms';
+            $dbUser = $env['DB_USER'] ?? 'root';
+            $dbPass = $env['DB_PASS'] ?? '';
+
+            $pdo = new \PDO("mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, [
+                \PDO::ATTR_TIMEOUT => 2,
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_SILENT,
+            ]);
+
+            $stmt = $pdo->query("SELECT api_key, secret_key FROM api_keys WHERE status = 'active' ORDER BY id ASC LIMIT 1");
+            if ($stmt && ($row = $stmt->fetch(\PDO::FETCH_ASSOC))) {
+                self::$cachedLocalElmsKey = $row;
+                return $row;
+            }
+        } catch (\Throwable $e) {}
+
+        return null;
     }
 
     /**
