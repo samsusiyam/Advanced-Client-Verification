@@ -223,8 +223,11 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
             <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
                     <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Expiry Date</div>
-                    <div style="font-size: 13px; font-weight: 600; color: <?php echo $details['expiry_date'] === 'Lifetime / Ongoing' ? '#16a34a' : '#0f172a'; ?>;">
+                    <div style="font-size: 13px; font-weight: 600; color: <?php echo $status === 'expired' ? '#dc2626' : ($details['expiry_date'] === 'Lifetime / Ongoing' ? '#16a34a' : '#0f172a'); ?>;">
                         <i class="fa fa-calendar"></i> <?php echo htmlspecialchars($details['expiry_date']); ?>
+                        <?php if ($status === 'expired'): ?>
+                            <span class="label label-danger" style="font-size: 10px; margin-left: 4px;">Expired</span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
