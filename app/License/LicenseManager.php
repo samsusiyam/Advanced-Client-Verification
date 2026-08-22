@@ -17,7 +17,7 @@ class LicenseManager
 {
     public const DEFAULT_SERVER_URL  = 'https://lic.hostnibo.com';
     public const DEFAULT_PRODUCT_KEY = 'ADVANCED-CLIENT-VERIFICATION';
-    public const CACHE_TTL_SECONDS   = 1800; // 30 minutes offline TTL for client area fallback
+    public const CACHE_TTL_SECONDS   = 900; // 15 minutes offline fallback for client area checkout
 
     private static ?self $instance = null;
 
@@ -49,7 +49,7 @@ class LicenseManager
      *
      * @param bool $forceRemote Force remote verification against ELMS server
      */
-    public static function isLicensed(bool $forceRemote = false): bool
+    public static function isLicensed(bool $forceRemote = true): bool
     {
         return self::getInstance()->checkLicenseValid($forceRemote);
     }
@@ -171,47 +171,32 @@ class LicenseManager
     }
 
     /**
-     * Determine if license is currently valid.
-     *
-     * Performs real-time server check when:
-     *  - $forceRemote is true
-     *  - Stored status is not active (suspended/terminated/expired/unlicensed)
-     *  - Domain or IP changed
-     *  - More than 60 seconds elapsed since last live verification in admin area
+     * Determine if license is currently valid in real-time.
      *
      * @param bool $forceRemote
      * @return bool
      */
-    public function checkLicenseValid(bool $forceRemote = false): bool
+    public function checkLicenseValid(bool $forceRemote = true): bool
     {
         $key = $this->getLicenseKey();
         if (empty($key)) {
             return false;
         }
 
-        $currentDomain = $this->getDomain();
-        $currentIp     = $this->getIp();
-        $status        = (string) cv_setting('license_status', 'unlicensed');
-        $lastCheck     = (int) cv_setting('license_last_check', 0);
-        $cachedDomain  = (string) cv_setting('license_domain', '');
-        $cachedIp      = (string) cv_setting('license_ip', '');
-
-        // If domain or IP changed from what was registered, force live check
-        if (!empty($cachedDomain) && strtolower($cachedDomain) !== strtolower($currentDomain)) {
-            $forceRemote = true;
-        }
-        if (!empty($cachedIp) && $cachedIp !== $currentIp) {
-            $forceRemote = true;
-        }
-
-        // In Admin Panel (or when forced or stale), run live verification
-        if ($forceRemote || (time() - $lastCheck) > 60 || $status !== 'active') {
+        // Live check against ELMS server
+        if ($forceRemote) {
             $res = $this->verify(true);
             return !empty($res['status']);
         }
 
-        // Fast path: cached active status
-        return ($status === 'active');
+        // Fast path for non-admin client-side fallback
+        $status = (string) cv_setting('license_status', 'unlicensed');
+        if ($status !== 'active') {
+            return false;
+        }
+
+        $cached = $this->readCache($key, $this->getDomain());
+        return ($cached !== null && !empty($cached['status']));
     }
 
     /**
@@ -286,7 +271,7 @@ class LicenseManager
 
             return $res;
         } catch (\Throwable $e) {
-            // In case of license server network outage, fall back to offline cache if still within grace period
+            // In case of license server network outage, fall back to offline cache if available
             $cached = $this->readCache($key, $domain);
             if ($cached !== null && ($cached['domain'] ?? '') === $domain) {
                 $cached['is_cached'] = true;
@@ -453,11 +438,16 @@ class LicenseManager
     /**
      * Returns license details for the admin panel.
      *
+     * @param bool $refreshLive Fetch fresh status live from ELMS
      * @return array<string,mixed>
      */
-    public function getDetails(): array
+    public function getDetails(bool $refreshLive = false): array
     {
-        $key       = $this->getLicenseKey();
+        $key = $this->getLicenseKey();
+        if ($refreshLive && !empty($key)) {
+            $this->verify(true);
+        }
+
         $status    = (string) cv_setting('license_status', 'unlicensed');
         $expiry    = (string) cv_setting('license_expiry', '');
         $lastCheck = (int) cv_setting('license_last_check', 0);
@@ -518,8 +508,8 @@ class LicenseManager
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => $body,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 10,
-                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT        => 8,
+                CURLOPT_CONNECTTIMEOUT => 4,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => 0,
                 CURLOPT_HTTPHEADER     => $headers,
@@ -539,7 +529,7 @@ class LicenseManager
                     'method'  => 'POST',
                     'header'  => implode("\r\n", $headers),
                     'content' => $body,
-                    'timeout' => 10,
+                    'timeout' => 8,
                 ],
                 'ssl' => [
                     'verify_peer'      => false,
@@ -600,7 +590,7 @@ class LicenseManager
             return null;
         }
 
-        // Domain mismatch in cache -> invalidate
+        // Domain mismatch in cache -> invalidate immediately
         if (strtolower((string)$data['domain']) !== strtolower($domain)) {
             @unlink($file);
             return null;

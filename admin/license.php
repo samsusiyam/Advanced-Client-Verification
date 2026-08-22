@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$details = $licenseManager->getDetails();
+$details = $licenseManager->getDetails(true);
 $isLicensed = $details['is_licensed'];
 $status = strtolower($details['status']);
 
