@@ -8,7 +8,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
  * LicenseManager
  *
  * Handles license verification, activation, deactivation, and updates
- * against HostNibo's ELMS License Server using direct license_key + domain matching.
+ * against HostNibo's ELMS License Server with real-time status and domain enforcement.
  *
  * @package ClientVerification\License
  * @author  HostNibo
@@ -17,7 +17,7 @@ class LicenseManager
 {
     public const DEFAULT_SERVER_URL  = 'https://lic.hostnibo.com';
     public const DEFAULT_PRODUCT_KEY = 'ADVANCED-CLIENT-VERIFICATION';
-    public const CACHE_TTL_SECONDS   = 43200; // 12 hours
+    public const CACHE_TTL_SECONDS   = 1800; // 30 minutes offline TTL for client area fallback
 
     private static ?self $instance = null;
 
@@ -46,10 +46,12 @@ class LicenseManager
 
     /**
      * Fast check: returns true if the module currently has an active valid license.
+     *
+     * @param bool $forceRemote Force remote verification against ELMS server
      */
-    public static function isLicensed(): bool
+    public static function isLicensed(bool $forceRemote = false): bool
     {
-        return self::getInstance()->checkLicenseValid();
+        return self::getInstance()->checkLicenseValid($forceRemote);
     }
 
     /**
@@ -169,31 +171,47 @@ class LicenseManager
     }
 
     /**
-     * Determine if license is currently valid (cached or live).
+     * Determine if license is currently valid.
+     *
+     * Performs real-time server check when:
+     *  - $forceRemote is true
+     *  - Stored status is not active (suspended/terminated/expired/unlicensed)
+     *  - Domain or IP changed
+     *  - More than 60 seconds elapsed since last live verification in admin area
+     *
+     * @param bool $forceRemote
+     * @return bool
      */
-    public function checkLicenseValid(): bool
+    public function checkLicenseValid(bool $forceRemote = false): bool
     {
         $key = $this->getLicenseKey();
         if (empty($key)) {
             return false;
         }
 
-        // 1. Check cached state
-        $cached = $this->readCache($key, $this->getDomain());
-        if ($cached !== null && !empty($cached['status'])) {
-            return true;
+        $currentDomain = $this->getDomain();
+        $currentIp     = $this->getIp();
+        $status        = (string) cv_setting('license_status', 'unlicensed');
+        $lastCheck     = (int) cv_setting('license_last_check', 0);
+        $cachedDomain  = (string) cv_setting('license_domain', '');
+        $cachedIp      = (string) cv_setting('license_ip', '');
+
+        // If domain or IP changed from what was registered, force live check
+        if (!empty($cachedDomain) && strtolower($cachedDomain) !== strtolower($currentDomain)) {
+            $forceRemote = true;
+        }
+        if (!empty($cachedIp) && $cachedIp !== $currentIp) {
+            $forceRemote = true;
         }
 
-        // 2. Check if cached status in settings is active and verified within grace period
-        $status = cv_setting('license_status', '');
-        $lastCheck = (int) cv_setting('license_last_check', 0);
-        if ($status === 'active' && (time() - $lastCheck) < self::CACHE_TTL_SECONDS) {
-            return true;
+        // In Admin Panel (or when forced or stale), run live verification
+        if ($forceRemote || (time() - $lastCheck) > 60 || $status !== 'active') {
+            $res = $this->verify(true);
+            return !empty($res['status']);
         }
 
-        // 3. Fallback: run a live check
-        $res = $this->verify(false);
-        return !empty($res['status']);
+        // Fast path: cached active status
+        return ($status === 'active');
     }
 
     /**
@@ -202,7 +220,7 @@ class LicenseManager
      * @param bool $forceRemote Force remote HTTP call regardless of cache
      * @return array{status:bool,message:string,data:array<string,mixed>,is_cached?:bool}
      */
-    public function verify(bool $forceRemote = false): array
+    public function verify(bool $forceRemote = true): array
     {
         $key    = $this->getLicenseKey();
         $domain = $this->getDomain();
@@ -216,7 +234,7 @@ class LicenseManager
             ];
         }
 
-        // Check cache first if not forced
+        // Check offline cache only if remote call is not forced
         if (!$forceRemote) {
             $cached = $this->readCache($key, $domain);
             if ($cached !== null) {
@@ -240,32 +258,44 @@ class LicenseManager
                 cv_setting_set('license_status', 'active');
                 cv_setting_set('license_last_check', (string) time());
                 cv_setting_set('license_expiry', (string) ($res['data']['expiry'] ?? ''));
+                cv_setting_set('license_domain', $domain);
+                cv_setting_set('license_ip', $ip);
                 cv_setting_set('license_message', (string) ($res['message'] ?? 'License Valid'));
 
-                $this->writeCache($key, $domain, $res);
+                $this->writeCache($key, $domain, $ip, $res);
             } else {
                 $status = 'invalid';
-                if (stripos($res['message'] ?? '', 'expired') !== false) {
+                $msg = $res['message'] ?? 'License verification failed';
+                if (stripos($msg, 'expired') !== false) {
                     $status = 'expired';
-                } elseif (stripos($res['message'] ?? '', 'suspended') !== false) {
+                } elseif (stripos($msg, 'suspended') !== false) {
                     $status = 'suspended';
-                } elseif (stripos($res['message'] ?? '', 'terminated') !== false) {
+                } elseif (stripos($msg, 'terminated') !== false) {
                     $status = 'terminated';
+                } elseif (stripos($msg, 'domain') !== false) {
+                    $status = 'domain_mismatch';
+                } elseif (stripos($msg, 'ip') !== false) {
+                    $status = 'ip_mismatch';
                 }
+
                 cv_setting_set('license_status', $status);
-                cv_setting_set('license_message', (string) ($res['message'] ?? 'License invalid'));
+                cv_setting_set('license_last_check', (string) time());
+                cv_setting_set('license_message', (string) $msg);
                 $this->clearCache($key, $domain);
             }
 
             return $res;
         } catch (\Throwable $e) {
-            // In case of network outage, fall back to cache if available
+            // In case of license server network outage, fall back to offline cache if still within grace period
             $cached = $this->readCache($key, $domain);
-            if ($cached !== null) {
+            if ($cached !== null && ($cached['domain'] ?? '') === $domain) {
                 $cached['is_cached'] = true;
                 $cached['message'] = ($cached['message'] ?? 'License Valid') . ' (offline cached)';
                 return $cached;
             }
+
+            cv_setting_set('license_status', 'unreachable');
+            cv_setting_set('license_message', 'License server connection failed: ' . $e->getMessage());
 
             return [
                 'status'  => false,
@@ -315,9 +345,11 @@ class LicenseManager
                 cv_setting_set('license_status', 'active');
                 cv_setting_set('license_last_check', (string) time());
                 cv_setting_set('license_expiry', (string) ($res['data']['expiry'] ?? ''));
+                cv_setting_set('license_domain', $domain);
+                cv_setting_set('license_ip', $ip);
                 cv_setting_set('license_message', (string) ($res['message'] ?? 'License Activated'));
 
-                $this->writeCache($key, $domain, $res);
+                $this->writeCache($key, $domain, $ip, $res);
 
                 if (function_exists('cv_log_audit')) {
                     cv_log_audit(0, 'license_activated', (int)($_SESSION['adminid'] ?? 0), 'Module license activated successfully for domain ' . $domain);
@@ -330,8 +362,22 @@ class LicenseManager
                 ];
             }
 
-            cv_setting_set('license_status', 'invalid');
-            cv_setting_set('license_message', (string) ($res['message'] ?? 'Activation failed'));
+            $status = 'invalid';
+            $msg = $res['message'] ?? 'Activation failed';
+            if (stripos($msg, 'expired') !== false) {
+                $status = 'expired';
+            } elseif (stripos($msg, 'suspended') !== false) {
+                $status = 'suspended';
+            } elseif (stripos($msg, 'terminated') !== false) {
+                $status = 'terminated';
+            } elseif (stripos($msg, 'domain') !== false) {
+                $status = 'domain_mismatch';
+            }
+
+            cv_setting_set('license_status', $status);
+            cv_setting_set('license_message', $msg);
+            $this->clearCache($key, $domain);
+
             return $res;
         } catch (\Throwable $e) {
             return [
@@ -412,10 +458,10 @@ class LicenseManager
     public function getDetails(): array
     {
         $key       = $this->getLicenseKey();
-        $status    = cv_setting('license_status', 'unlicensed');
-        $expiry    = cv_setting('license_expiry', '');
+        $status    = (string) cv_setting('license_status', 'unlicensed');
+        $expiry    = (string) cv_setting('license_expiry', '');
         $lastCheck = (int) cv_setting('license_last_check', 0);
-        $message   = cv_setting('license_message', '');
+        $message   = (string) cv_setting('license_message', '');
         $domain    = $this->getDomain();
         $ip        = $this->getIp();
 
@@ -444,7 +490,7 @@ class LicenseManager
     }
 
     // -------------------------------------------------------------------------
-    // Clean HTTP Transport (Standard JSON POST, no API key required)
+    // Clean HTTP Transport (Direct JSON POST)
     // -------------------------------------------------------------------------
 
     /**
@@ -472,8 +518,8 @@ class LicenseManager
                 CURLOPT_POST           => true,
                 CURLOPT_POSTFIELDS     => $body,
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT        => 15,
-                CURLOPT_CONNECTTIMEOUT => 7,
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => 0,
                 CURLOPT_HTTPHEADER     => $headers,
@@ -493,7 +539,7 @@ class LicenseManager
                     'method'  => 'POST',
                     'header'  => implode("\r\n", $headers),
                     'content' => $body,
-                    'timeout' => 15,
+                    'timeout' => 10,
                 ],
                 'ssl' => [
                     'verify_peer'      => false,
@@ -525,11 +571,13 @@ class LicenseManager
         return $this->cacheDir . '/lic_' . substr($hash, 0, 32) . '.json';
     }
 
-    private function writeCache(string $licenseKey, string $domain, array $payload): void
+    private function writeCache(string $licenseKey, string $domain, string $ip, array $payload): void
     {
         $file = $this->getCacheFile($licenseKey, $domain);
         $data = [
             'ts'      => time(),
+            'domain'  => $domain,
+            'ip'      => $ip,
             'payload' => $payload,
         ];
         @file_put_contents($file, json_encode($data));
@@ -548,7 +596,13 @@ class LicenseManager
         }
 
         $data = json_decode($content, true);
-        if (!is_array($data) || !isset($data['payload'], $data['ts'])) {
+        if (!is_array($data) || !isset($data['payload'], $data['ts'], $data['domain'])) {
+            return null;
+        }
+
+        // Domain mismatch in cache -> invalidate
+        if (strtolower((string)$data['domain']) !== strtolower($domain)) {
+            @unlink($file);
             return null;
         }
 

@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($res['status'])) {
             $successMessage = $res['message'] ?? 'License activated successfully!';
         } else {
-            $errorMessage = $res['message'] ?? 'Activation failed. Please check your license key and server connection.';
+            $errorMessage = $res['message'] ?? 'Activation failed. Please check your license key and domain binding.';
         }
     } elseif (isset($_POST['cv_verify_license'])) {
         $res = $licenseManager->verify(true);
@@ -56,6 +56,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $details = $licenseManager->getDetails();
 $isLicensed = $details['is_licensed'];
+$status = strtolower($details['status']);
+
+// Determine theme styling based on license state
+$bannerBg = 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)';
+$bannerBorder = '#fed7aa';
+$bannerIconBg = '#ea580c';
+$bannerIcon = 'fa-lock';
+$bannerTitle = 'License Activation Required';
+$bannerTitleColor = '#7c2d12';
+$bannerDescColor = '#9a3412';
+$badgeBg = '#f97316';
+$badgeText = strtoupper($status);
+$bannerDesc = 'Enter your valid license key below to unlock automated KYC verification and client management.';
+
+if ($status === 'active') {
+    $bannerBg = 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)';
+    $bannerBorder = '#bbf7d0';
+    $bannerIconBg = '#16a34a';
+    $bannerIcon = 'fa-shield';
+    $bannerTitle = 'License Active & Genuine';
+    $bannerTitleColor = '#14532d';
+    $bannerDescColor = '#166534';
+    $badgeBg = '#22c55e';
+    $badgeText = 'ACTIVE';
+    $bannerDesc = 'Your module is licensed, verified, and running with active protection.';
+} elseif ($status === 'suspended') {
+    $bannerBg = 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)';
+    $bannerBorder = '#fecaca';
+    $bannerIconBg = '#dc2626';
+    $bannerIcon = 'fa-ban';
+    $bannerTitle = 'License Suspended';
+    $bannerTitleColor = '#991b1b';
+    $bannerDescColor = '#b91c1c';
+    $badgeBg = '#dc2626';
+    $badgeText = 'SUSPENDED';
+    $bannerDesc = 'Your license has been suspended by HostNibo. Automated KYC verification and admin features are temporarily locked.';
+} elseif ($status === 'terminated') {
+    $bannerBg = 'linear-gradient(135deg, #450a0a 0%, #7f1d1d 100%)';
+    $bannerBorder = '#991b1b';
+    $bannerIconBg = '#000000';
+    $bannerIcon = 'fa-times-circle';
+    $bannerTitle = 'License Terminated';
+    $bannerTitleColor = '#ffffff';
+    $bannerDescColor = '#fecaca';
+    $badgeBg = '#000000';
+    $badgeText = 'TERMINATED';
+    $bannerDesc = 'This license has been permanently terminated. Please obtain a new license to continue using the module.';
+} elseif ($status === 'domain_mismatch') {
+    $bannerBg = 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)';
+    $bannerBorder = '#fecaca';
+    $bannerIconBg = '#e11d48';
+    $bannerIcon = 'fa-globe';
+    $bannerTitle = 'Domain Mismatch';
+    $bannerTitleColor = '#9f1239';
+    $bannerDescColor = '#be123c';
+    $badgeBg = '#e11d48';
+    $badgeText = 'DOMAIN MISMATCH';
+    $bannerDesc = 'This license is registered to a different domain. Please re-verify or activate a license valid for ' . htmlspecialchars($details['domain']) . '.';
+} elseif ($status === 'expired') {
+    $bannerBg = 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)';
+    $bannerBorder = '#fecdd3';
+    $bannerIconBg = '#e11d48';
+    $bannerIcon = 'fa-calendar-times-o';
+    $bannerTitle = 'License Expired';
+    $bannerTitleColor = '#881337';
+    $bannerDescColor = '#9f1239';
+    $badgeBg = '#e11d48';
+    $badgeText = 'EXPIRED';
+    $bannerDesc = 'Your product license subscription has expired. Please renew your license key on HostNibo.';
+}
 
 cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product license, activation, and automated updates.');
 ?>
@@ -83,38 +153,34 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
 
 <!-- Main Status Banner -->
 <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); margin-bottom: 24px; overflow: hidden;">
-    <div style="padding: 24px 28px; background: <?php echo $isLicensed ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)'; ?>; border-bottom: 1px solid <?php echo $isLicensed ? '#bbf7d0' : '#fed7aa'; ?>; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div style="padding: 24px 28px; background: <?php echo $bannerBg; ?>; border-bottom: 1px solid <?php echo $bannerBorder; ?>; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
         <div style="display: flex; align-items: center; gap: 16px;">
-            <div style="width: 54px; height: 54px; border-radius: 50%; background: <?php echo $isLicensed ? '#16a34a' : '#ea580c'; ?>; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                <i class="fa <?php echo $isLicensed ? 'fa-shield' : 'fa-lock'; ?>"></i>
+            <div style="width: 54px; height: 54px; border-radius: 50%; background: <?php echo $bannerIconBg; ?>; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 26px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <i class="fa <?php echo $bannerIcon; ?>"></i>
             </div>
             <div>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    <h3 style="margin: 0; font-size: 20px; font-weight: 700; color: <?php echo $isLicensed ? '#14532d' : '#7c2d12'; ?>;">
-                        <?php echo $isLicensed ? 'License Active & Genuine' : 'License Activation Required'; ?>
+                    <h3 style="margin: 0; font-size: 20px; font-weight: 700; color: <?php echo $bannerTitleColor; ?>;">
+                        <?php echo $bannerTitle; ?>
                     </h3>
-                    <span style="background: <?php echo $isLicensed ? '#22c55e' : '#f97316'; ?>; color: #ffffff; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 12px; text-transform: uppercase;">
-                        <?php echo htmlspecialchars($details['status']); ?>
+                    <span style="background: <?php echo $badgeBg; ?>; color: #ffffff; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 12px; text-transform: uppercase;">
+                        <?php echo htmlspecialchars($badgeText); ?>
                     </span>
                 </div>
-                <p style="margin: 4px 0 0 0; color: <?php echo $isLicensed ? '#166534' : '#9a3412'; ?>; font-size: 13px;">
-                    <?php if ($isLicensed): ?>
-                        Your module is licensed, verified, and active.
-                    <?php else: ?>
-                        Enter your valid license key below to unlock automated KYC verification and client management.
-                    <?php endif; ?>
+                <p style="margin: 4px 0 0 0; color: <?php echo $bannerDescColor; ?>; font-size: 13px;">
+                    <?php echo htmlspecialchars($bannerDesc); ?>
                 </p>
             </div>
         </div>
 
         <div style="display: flex; gap: 8px;">
+            <form method="POST" style="margin: 0;">
+                <?php echo Csrf::field(); ?>
+                <button type="submit" name="cv_verify_license" value="1" class="btn btn-default btn-sm" style="background: #ffffff; font-weight: 600; border-color: #cbd5e1;">
+                    <i class="fa fa-refresh"></i> Re-verify
+                </button>
+            </form>
             <?php if ($isLicensed): ?>
-                <form method="POST" style="margin: 0;">
-                    <?php echo Csrf::field(); ?>
-                    <button type="submit" name="cv_verify_license" value="1" class="btn btn-default btn-sm" style="background: #ffffff; font-weight: 600; border-color: #cbd5e1;">
-                        <i class="fa fa-refresh"></i> Re-verify
-                    </button>
-                </form>
                 <form method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to deactivate this license? This will free the activation slot on the license server.');">
                     <?php echo Csrf::field(); ?>
                     <button type="submit" name="cv_deactivate_license" value="1" class="btn btn-danger btn-sm" style="font-weight: 600;">
@@ -167,6 +233,15 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
                     <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Expiry Date</div>
                     <div style="font-size: 13px; font-weight: 600; color: <?php echo $details['expiry_date'] === 'Lifetime / Ongoing' ? '#16a34a' : '#0f172a'; ?>;">
                         <i class="fa fa-calendar"></i> <?php echo htmlspecialchars($details['expiry_date']); ?>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-9 col-sm-6" style="margin-bottom: 18px;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Server Verification Message</div>
+                    <div style="font-size: 13px; font-weight: 600; color: <?php echo $isLicensed ? '#16a34a' : '#dc2626'; ?>;">
+                        <i class="fa <?php echo $isLicensed ? 'fa-check' : 'fa-info-circle'; ?>"></i> <?php echo htmlspecialchars($details['message'] ?: ($isLicensed ? 'License active and valid.' : 'Unlicensed install')); ?>
                     </div>
                 </div>
             </div>
