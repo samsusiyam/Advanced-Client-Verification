@@ -1,4 +1,4 @@
-﻿{
+{
     "schema": "1.0",
     "type": "whmcs-addon",
     "name": "clientverification",
@@ -6,15 +6,15 @@
     "description": {
         "headline": "Enterprise-grade automated & manual KYC verification module by HostNibo.",
         "features": [
-            "AI-powered biometric automated KYC verification with Didit integration",
-            "Manual government-issued ID & document review workflow",
+            "Biometric automated KYC verification with Didit integration",
+            "Manual government-issued ID and document review workflow",
             "Hybrid verification modes with seamless automatic fallback",
             "Custom KYC product rules, categories, and client group enforcement",
-            "Comprehensive fraud risk scoring & duplicate document detection engine",
+            "Risk evaluation and duplicate document detection engine",
             "Private AES-256 encrypted document storage outside web root",
-            "Multi-channel email notifications & custom admin routing",
+            "Multi-channel email notifications and custom admin routing",
             "HMAC-secured inbound and outbound webhooks",
-            "Full audit timeline & compliance logging"
+            "Full audit timeline and compliance logging"
         ]
     },
     "version": "1.0.0",
@@ -33,7 +33,7 @@
     },
     "license": "MIT",
     "minimumPhpVersion": "8.1",
-    "maximumPhpVersion": "8.3",
+    "maximumPhpVersion": "8.4",
     "minimumWhmcsVersion": "8.0",
-    "maximumWhmcsVersion": "9.0"
+    "maximumWhmcsVersion": "9.9"
 }
