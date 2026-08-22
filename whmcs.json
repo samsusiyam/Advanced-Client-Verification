@@ -1,8 +1,7 @@
 {
     "schema": "1.0",
     "type": "whmcs-addon",
-    "module": "clientverification",
-    "name": "Advanced Client Verification",
+    "name": "clientverification",
     "displayName": "Advanced Client Verification",
     "display_name": "Advanced Client Verification",
     "title": "Advanced Client Verification",
