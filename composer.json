@@ -3,9 +3,11 @@
     "description": "Production-ready open-source KYC verification for WHMCS (Manual, Didit, Hybrid).",
     "type": "whmcs-addon",
     "license": "MIT",
+    "homepage": "https://hostnibo.com",
     "authors": [
         {
-            "name": "Advanced Client Verification Contributors"
+            "name": "HostNibo",
+            "homepage": "https://siyam.bio.link"
         }
     ],
     "require": {

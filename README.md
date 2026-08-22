@@ -88,6 +88,11 @@ and Mass Assignment (allowlist). See `docs/security.md`.
 PHPUnit unit, integration, and security tests are in `tests/`. Run with
 `composer test` (requires PHPUnit). See `docs/development.md`.
 
+## Support & Authors
+
+- **Author**: [HostNibo](https://hostnibo.com)
+- **Support**: [https://siyam.bio.link](https://siyam.bio.link)
+
 ## License
 
 MIT — see `LICENSE`.

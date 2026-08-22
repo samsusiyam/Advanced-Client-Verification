@@ -754,11 +754,17 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
         </div>
     </div>
 
-    <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 24px; display: flex; justify-content: flex-end; gap: 10px;">
-        <a href="addonmodules.php?module=clientverification&action=dashboard" class="btn btn-default">Cancel</a>
-        <button type="submit" class="btn btn-primary" style="padding: 7px 24px; font-weight: 600;">
-            <i class="fa fa-save"></i> Save Settings
-        </button>
+    <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #64748b;">
+            <img src="../modules/addons/clientverification/logo.png" alt="HostNibo" style="height: 28px; width: auto; object-fit: contain; border-radius: 4px;">
+            <span>Advanced Client Verification v1.0.0 by <strong><a href="https://hostnibo.com" target="_blank" style="color: #2563eb; text-decoration: none;">HostNibo</a></strong> &bull; <a href="https://siyam.bio.link" target="_blank" style="color: #0284c7; text-decoration: underline;"><i class="fa fa-life-ring"></i> Get Support</a></span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="addonmodules.php?module=clientverification&action=dashboard" class="btn btn-default">Cancel</a>
+            <button type="submit" class="btn btn-primary" style="padding: 7px 24px; font-weight: 600;">
+                <i class="fa fa-save"></i> Save Settings
+            </button>
+        </div>
     </div>
 </div>
 </form>

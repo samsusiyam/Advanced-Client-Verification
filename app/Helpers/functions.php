@@ -498,17 +498,25 @@ if (!function_exists('cv_admin_header')) {
 
         echo '<div class="cv-admin-wrapper" style="margin-bottom: 22px; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif;">';
         
-        echo '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px;">';
+        echo '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">';
+        echo '<div style="display: flex; align-items: center; gap: 12px;">';
+        $logoPath = '../modules/addons/clientverification/logo.png';
+        if (file_exists(__DIR__ . '/../../logo.png')) {
+            echo '<img src="' . $logoPath . '" alt="HostNibo" style="height: 38px; width: auto; object-fit: contain; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">';
+        } else {
+            echo '<span style="color: #2563eb; font-size: 26px;"><i class="fa fa-shield"></i></span>';
+        }
         echo '<div>';
-        echo '<h2 style="margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">';
-        echo '<span style="color: #2563eb;"><i class="fa fa-shield"></i></span> Advanced Client Verification';
+        echo '<h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 8px;">';
+        echo 'Advanced Client Verification';
         if ($title) {
-            echo '<span style="color: #cbd5e1; font-weight: 300;"> / </span> <span style="font-size: 19px; font-weight: 600; color: #334155;">' . htmlspecialchars($title) . '</span>';
+            echo '<span style="color: #cbd5e1; font-weight: 300;"> / </span> <span style="font-size: 18px; font-weight: 600; color: #334155;">' . htmlspecialchars($title) . '</span>';
         }
         echo '</h2>';
         if ($subtitle) {
-            echo '<p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">' . htmlspecialchars($subtitle) . '</p>';
+            echo '<p style="margin: 3px 0 0 0; color: #64748b; font-size: 13px;">' . htmlspecialchars($subtitle) . '</p>';
         }
+        echo '</div>';
         echo '</div>';
         
         $mode = cv_setting('verification_mode', 'hybrid');
@@ -516,12 +524,14 @@ if (!function_exists('cv_admin_header')) {
         $statusColor = $enabled ? '#10b981' : '#ef4444';
         $statusText = $enabled ? 'Active' : 'Disabled';
         
-        echo '<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #475569; background: #f8fafc; padding: 6px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">';
+        echo '<div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px; color: #475569; background: #f8fafc; padding: 6px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">';
+        echo '<span>Author: <strong><a href="https://hostnibo.com" target="_blank" style="color: #2563eb; text-decoration: none;">HostNibo</a></strong></span>';
+        echo '<span style="color: #cbd5e1;">|</span>';
         echo '<span>Status: <strong style="color: ' . $statusColor . ';">' . $statusText . '</strong></span>';
         echo '<span style="color: #cbd5e1;">|</span>';
         echo '<span>Mode: <strong style="text-transform: uppercase; color: #2563eb;">' . htmlspecialchars($mode) . '</strong></span>';
         echo '<span style="color: #cbd5e1;">|</span>';
-        echo '<span>v1.0.0</span>';
+        echo '<a href="https://siyam.bio.link" target="_blank" class="btn btn-default btn-xs" style="font-weight: 600; color: #0284c7; border-color: #cbd5e1;"><i class="fa fa-life-ring"></i> Support</a>';
         echo '</div>';
         echo '</div>';
 
