@@ -224,10 +224,13 @@ add_hook('ClientAreaPrimaryNavbar', 1, function ($primaryNavbar) {
 });
 
 /**
- * Run scheduled verification tasks via WHMCS cron.
+ * Run scheduled verification tasks via WHMCS native daily cron.
  */
 function clientverification_daily_cron($vars)
 {
+    if (file_exists(__DIR__ . '/cron.php')) {
+        require_once __DIR__ . '/cron.php';
+    }
     if (function_exists('cv_run_cron')) {
         cv_run_cron();
     }
