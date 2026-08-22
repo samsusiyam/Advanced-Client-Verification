@@ -63,6 +63,9 @@ $token = TokenAuth::authenticate($bearer);
 if (!$token) {
     api_response(401, ['error' => 'unauthorized']);
 }
+if (!cv_is_licensed()) {
+    api_response(403, ['error' => 'license_required', 'message' => 'Module license is inactive or expired.']);
+}
 if (TokenAuth::rateLimited($token)) {
     api_response(429, ['error' => 'rate_limited']);
 }

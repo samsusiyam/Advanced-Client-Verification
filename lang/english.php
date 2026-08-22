@@ -55,3 +55,13 @@ $_LANG['cv_personal_info'] = 'Personal Information';
 $_LANG['cv_upload_document'] = 'Upload Document';
 $_LANG['cv_checkout_blocked'] = 'Identity verification is required.';
 $_LANG['cv_verify_now'] = 'Verify Now';
+$_LANG['cv_license'] = 'License';
+$_LANG['cv_license_status'] = 'License Status';
+$_LANG['cv_license_key'] = 'License Key';
+$_LANG['cv_license_active'] = 'Active & Genuine';
+$_LANG['cv_license_invalid'] = 'Invalid / Expired';
+$_LANG['cv_license_activate'] = 'Activate License';
+$_LANG['cv_license_deactivate'] = 'Deactivate License';
+$_LANG['cv_license_reverify'] = 'Re-verify License';
+$_LANG['cv_license_notice'] = 'License activation is required to use this module.';
+

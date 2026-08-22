@@ -19,7 +19,14 @@ function clientverification_config()
         'author' => 'HostNibo',
         'category' => 'Security',
         'language' => 'english',
-        'fields' => [],
+        'fields' => [
+            'license_key' => [
+                'FriendlyName' => 'License Key',
+                'Type' => 'text',
+                'Size' => '60',
+                'Description' => 'Your HostNibo module license key (from <a href="https://hostnibo.com" target="_blank">HostNibo Client Area</a>).',
+            ],
+        ],
     ];
 }
 
@@ -83,6 +90,14 @@ function clientverification_output($vars)
 {
     $action = $_GET['action'] ?? 'dashboard';
 
+    // Sync license key from addon settings if present
+    if (!empty($vars['license_key'])) {
+        $storedKey = cv_setting('license_key', '');
+        if (empty($storedKey) || $storedKey !== trim($vars['license_key'])) {
+            \ClientVerification\License\LicenseManager::getInstance()->saveLicenseKey(trim($vars['license_key']));
+        }
+    }
+
     // Ensure database columns are up-to-date
     try {
         if (!Capsule::schema()->hasColumn('mod_cv_verifications', 'document_number')) {
@@ -120,6 +135,14 @@ function clientverification_output($vars)
         require_once $langFile;
     }
 
+    // License Gatekeeper: If unlicensed and not activating, enforce License activation screen
+    $isLicensed = cv_is_licensed();
+    if (!$isLicensed && $action !== 'license') {
+        // If POST request to activate/save is present, load license page to process it
+        require_once __DIR__ . '/admin/license.php';
+        return;
+    }
+
     switch ($action) {
         case 'dashboard':
             require_once __DIR__ . '/admin/dashboard.php';
@@ -132,6 +155,9 @@ function clientverification_output($vars)
             break;
         case 'settings':
             require_once __DIR__ . '/admin/settings.php';
+            break;
+        case 'license':
+            require_once __DIR__ . '/admin/license.php';
             break;
         case 'product-rules':
             require_once __DIR__ . '/admin/product-rules.php';
@@ -162,6 +188,21 @@ function clientverification_output($vars)
 
 function clientverification_clientarea($vars)
 {
+    // License fail-safe: gracefully notify if module is inactive
+    if (!cv_is_licensed()) {
+        return [
+            'pagetitle' => 'Identity Verification',
+            'breadcrumb' => [
+                'index.php?m=clientverification' => 'Identity Verification',
+            ],
+            'templatefile' => 'templates/clientarea',
+            'requirelogin' => true,
+            'vars' => [
+                'content' => '<div style="max-width: 580px; margin: 40px auto; background: #ffffff; border: 1px solid #fed7aa; border-radius: 10px; padding: 30px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.03);"><div style="width: 54px; height: 54px; background: #ffedd5; color: #ea580c; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 24px;"><i class="fa fa-info-circle"></i></div><h3 style="margin: 0 0 8px 0; color: #9a3412; font-size: 18px; font-weight: 700;">Service Notice</h3><p style="color: #64748b; font-size: 14px; margin: 0;">Identity verification is currently undergoing scheduled system maintenance. Please check back shortly.</p></div>',
+            ],
+        ];
+    }
+
     $action = $_GET['action'] ?? 'index';
 
     $langFile = __DIR__ . '/lang/english.php';

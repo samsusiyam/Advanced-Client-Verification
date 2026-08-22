@@ -19,7 +19,7 @@ if (!defined('WHMCS')) {
  */
 function cv_render_client_banner(string $context = 'general'): string
 {
-    if (cv_setting('enabled', 'yes') !== 'yes') {
+    if (!cv_is_licensed() || cv_setting('enabled', 'yes') !== 'yes') {
         return '';
     }
     $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
@@ -122,7 +122,7 @@ function cv_render_client_banner(string $context = 'general'): string
  */
 function clientverification_checkout_guard($vars)
 {
-    if (cv_setting('enabled', 'yes') !== 'yes') {
+    if (!cv_is_licensed() || cv_setting('enabled', 'yes') !== 'yes') {
         return [];
     }
 
@@ -171,6 +171,10 @@ function clientverification_checkout_guard($vars)
  */
 function clientverification_cart_notice($vars)
 {
+    if (!cv_is_licensed()) {
+        return $vars;
+    }
+
     $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));
     if (!$clientId) {
         return $vars;
@@ -207,7 +211,7 @@ add_hook('DailyCronJob', 1, 'clientverification_daily_cron');
  * Add Identity Verification menu item to the Client Area primary navbar.
  */
 add_hook('ClientAreaPrimaryNavbar', 1, function ($primaryNavbar) {
-    if (cv_setting('enabled', 'yes') !== 'yes') {
+    if (!cv_is_licensed() || cv_setting('enabled', 'yes') !== 'yes') {
         return;
     }
     $clientId = (int) (($_SESSION['uid'] ?? 0) ?: ($_SESSION['clientsdetails']['userid'] ?? 0));

@@ -22,6 +22,17 @@ function cv_run_cron()
     $now = time();
     $expiryDays = (int) ($config['verification_expiry_days'] ?? 365);
 
+    // 0. Periodic License Validation & Update Check with ELMS Server
+    if (class_exists('\\ClientVerification\\License\\LicenseManager')) {
+        try {
+            $licManager = \ClientVerification\License\LicenseManager::getInstance();
+            if (!empty($licManager->getLicenseKey())) {
+                $licManager->verify(true);
+                $licManager->checkUpdate('1.0.0');
+            }
+        } catch (\Throwable $e) {}
+    }
+
     // 1. Verification expiration.
     $expired = \ClientVerification\Services\VerificationService::expireOverdue();
 

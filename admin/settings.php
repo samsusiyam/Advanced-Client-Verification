@@ -339,6 +339,21 @@ cv_admin_header('settings', 'Settings', 'Configure verification modes, Didit KYC
 
     <!-- TAB 1: GENERAL -->
     <div class="cv-tab-panel <?php echo $activeTab === 'general' ? 'active' : ''; ?>" id="tab-general">
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <i class="fa fa-shield text-primary" style="font-size: 20px;"></i>
+                <div>
+                    <strong style="font-size: 13px; color: #1e293b;">HostNibo Product License:</strong>
+                    <span style="font-size: 13px; color: <?php echo cv_is_licensed() ? '#16a34a' : '#dc2626'; ?>; font-weight: 700;">
+                        <?php echo cv_is_licensed() ? 'Active &amp; Genuine' : 'Activation Required'; ?>
+                    </span>
+                </div>
+            </div>
+            <a href="addonmodules.php?module=clientverification&action=license" class="btn btn-default btn-xs" style="font-weight: 600;">
+                <i class="fa fa-key"></i> Manage License &amp; Updates &raquo;
+            </a>
+        </div>
+
         <div class="cv-section">
             <div class="cv-section-title"><i class="fa fa-power-off text-primary"></i> Module Activation &amp; Methods</div>
             <div class="cv-section-desc">Control which verification methods are available to your customers.</div>

@@ -92,6 +92,12 @@ if (!function_exists('cv_insert_default_settings')) {
             'mail_admin_high_risk' => 'yes',
             'mail_admin_info_response' => 'yes',
             'admin_notification_emails' => '',
+            'license_key' => '',
+            'license_server_url' => 'https://lic.hostnibo.com',
+            'license_product_key' => 'ADVANCED-CLIENT-VERIFICATION',
+            'license_status' => 'unlicensed',
+            'license_last_check' => '0',
+            'license_expiry' => '',
         ];
 
         try {
@@ -106,6 +112,16 @@ if (!function_exists('cv_insert_default_settings')) {
                 }
             }
         } catch (\Throwable $e) {}
+    }
+}
+
+if (!function_exists('cv_is_licensed')) {
+    /**
+     * Fast helper checking if the module has a valid, active ELMS license.
+     */
+    function cv_is_licensed(): bool
+    {
+        return \ClientVerification\License\LicenseManager::isLicensed();
     }
 }
 
@@ -483,11 +499,17 @@ if (!function_exists('cv_admin_header')) {
                 ->count();
         } catch (\Exception $e) {}
 
+        $isLic = cv_is_licensed();
+        $licStatus = cv_setting('license_status', 'unlicensed');
+        $licText = $isLic ? 'Active' : ($licStatus === 'expired' ? 'Expired' : ($licStatus === 'suspended' ? 'Suspended' : 'Unlicensed'));
+        $licColor = $isLic ? '#10b981' : '#ef4444';
+
         $navTabs = [
             'dashboard' => ['label' => 'Dashboard', 'icon' => 'fa-tachometer'],
             'verifications' => ['label' => 'Verifications', 'icon' => 'fa-id-card', 'badge' => $pendingCount],
             'documents' => ['label' => 'Documents', 'icon' => 'fa-folder-open'],
             'settings' => ['label' => 'Settings', 'icon' => 'fa-cogs'],
+            'license' => ['label' => 'License', 'icon' => 'fa-shield', 'badge' => ($isLic ? '' : '!'), 'badge_is_text' => true],
             'product-rules' => ['label' => 'Product Rules', 'icon' => 'fa-cube'],
             'group-rules' => ['label' => 'Group Rules', 'icon' => 'fa-users'],
             'webhooks' => ['label' => 'Webhooks', 'icon' => 'fa-bolt'],
@@ -527,6 +549,8 @@ if (!function_exists('cv_admin_header')) {
         echo '<div style="display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px; color: #475569; background: #f8fafc; padding: 6px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">';
         echo '<span>Author: <strong><a href="https://hostnibo.com" target="_blank" style="color: #2563eb; text-decoration: none;">HostNibo</a></strong></span>';
         echo '<span style="color: #cbd5e1;">|</span>';
+        echo '<span>License: <strong style="color: ' . $licColor . ';"><a href="addonmodules.php?module=clientverification&action=license" style="color: ' . $licColor . '; text-decoration: none;">' . $licText . '</a></strong></span>';
+        echo '<span style="color: #cbd5e1;">|</span>';
         echo '<span>Status: <strong style="color: ' . $statusColor . ';">' . $statusText . '</strong></span>';
         echo '<span style="color: #cbd5e1;">|</span>';
         echo '<span>Mode: <strong style="text-transform: uppercase; color: #2563eb;">' . htmlspecialchars($mode) . '</strong></span>';
@@ -545,10 +569,10 @@ if (!function_exists('cv_admin_header')) {
             
             echo '<a href="addonmodules.php?module=clientverification&action=' . urlencode($tab) . '" style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 13px; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: ' . $weight . '; background: ' . $bg . '; color: ' . $color . '; border: 1px solid ' . $border . '; transition: all 0.15s ease;">';
             echo '<i class="fa ' . $item['icon'] . '"></i> ' . htmlspecialchars($item['label']);
-            if (!empty($item['badge']) && $item['badge'] > 0) {
+            if (!empty($item['badge'])) {
                 $badgeBg = $isActive ? '#ffffff' : '#ef4444';
                 $badgeColor = $isActive ? '#dc2626' : '#ffffff';
-                echo ' <span style="background: ' . $badgeBg . '; color: ' . $badgeColor . '; font-size: 11px; padding: 1px 6px; border-radius: 10px; font-weight: 700; margin-left: 2px;">' . (int)$item['badge'] . '</span>';
+                echo ' <span style="background: ' . $badgeBg . '; color: ' . $badgeColor . '; font-size: 11px; padding: 1px 6px; border-radius: 10px; font-weight: 700; margin-left: 2px;">' . htmlspecialchars((string)$item['badge']) . '</span>';
             }
             echo '</a>';
         }

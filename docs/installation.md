@@ -17,8 +17,9 @@ Activation automatically:
 - Inserts default document types (passport, driver's license, national ID, selfie, proof of address)
 - Creates the WHMCS email templates (KYC Verification Started/Approved/Rejected/Manual Review Required/Additional Information Required/Expiring/Expired)
 
-## 3. Configure
-Set the module configuration values (Addon Modules configuration screen):
+## 3. Configure & Activate License
+Set the module configuration values (Addon Modules configuration screen or Module Admin Panel):
+- **License Key**: Enter your HostNibo License Key (from [HostNibo Client Area](https://hostnibo.com))
 - Verification Mode: Hybrid (default), Manual, or Didit
 - Didit API Key, Workflow ID, Webhook Secret (stored encrypted)
 - Storage path (outside `public_html`)
