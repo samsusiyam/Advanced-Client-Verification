@@ -7,38 +7,28 @@ use Illuminate\Database\Capsule\Manager as Capsule;
 /**
  * LicenseManager
  *
- * Integrates HostNibo's External License Management System (ELMS)
- * with the Advanced Client Verification module.
+ * Handles license verification, activation, deactivation, and updates
+ * against HostNibo's ELMS License Server using direct license_key + domain matching.
  *
  * @package ClientVerification\License
  * @author  HostNibo
  */
 class LicenseManager
 {
-    public const DEFAULT_SERVER_URL   = 'https://lic.hostnibo.com';
-    public const DEFAULT_PRODUCT_KEY  = 'ADVANCED-CLIENT-VERIFICATION';
-    public const DEFAULT_API_KEY      = 'elms_pk_2b7c1f9a4d6e8032a1c5b9e7f3d20481';
-    public const DEFAULT_API_SECRET   = 'elms_sk_9f83a1c04e7b2d6598301fbca5e47d29b8460af1c2d3e5f7';
-    public const CACHE_TTL_SECONDS    = 43200; // 12 hours
+    public const DEFAULT_SERVER_URL  = 'https://lic.hostnibo.com';
+    public const DEFAULT_PRODUCT_KEY = 'ADVANCED-CLIENT-VERIFICATION';
+    public const CACHE_TTL_SECONDS   = 43200; // 12 hours
 
     private static ?self $instance = null;
-    private static ?array $cachedLocalElmsKey = null;
 
     private string $serverUrl;
     private string $productKey;
-    private string $apiKey;
-    private string $apiSecret;
     private string $cacheDir;
-
-    private ?string $lastResponseSig = null;
-    private ?int $lastResponseTs = null;
 
     public function __construct()
     {
         $this->serverUrl  = $this->resolveServerUrl();
         $this->productKey = $this->resolveProductKey();
-        $this->apiKey     = $this->resolveApiKey();
-        $this->apiSecret  = $this->resolveApiSecret();
         $this->cacheDir   = dirname(__DIR__, 2) . '/storage/license';
 
         if (!is_dir($this->cacheDir)) {
@@ -67,7 +57,7 @@ class LicenseManager
      */
     public function resolveServerUrl(): string
     {
-        // 1. Explicit PHP constant (e.g. for development / testing)
+        // 1. Explicit PHP constant
         if (defined('CV_LICENSE_SERVER') && !empty(constant('CV_LICENSE_SERVER'))) {
             return rtrim(constant('CV_LICENSE_SERVER'), '/');
         }
@@ -111,116 +101,6 @@ class LicenseManager
             $pk = (string) cv_setting('license_product_key', '');
         }
         return !empty($pk) ? trim($pk) : self::DEFAULT_PRODUCT_KEY;
-    }
-
-    /**
-     * Resolve API Public Key.
-     */
-    public function resolveApiKey(): string
-    {
-        if (defined('CV_LICENSE_API_KEY') && !empty(constant('CV_LICENSE_API_KEY'))) {
-            return trim(constant('CV_LICENSE_API_KEY'));
-        }
-        $key = '';
-        if (function_exists('cv_setting')) {
-            $key = (string) cv_setting('license_api_key', '');
-        }
-        if (!empty($key)) {
-            return trim($key);
-        }
-
-        // Auto-detect local active API key from local ELMS database
-        $localKey = $this->getLocalElmsApiKey();
-        if (!empty($localKey['api_key'])) {
-            return $localKey['api_key'];
-        }
-
-        return self::DEFAULT_API_KEY;
-    }
-
-    /**
-     * Resolve API Secret Key.
-     */
-    public function resolveApiSecret(): string
-    {
-        if (defined('CV_LICENSE_API_SECRET') && !empty(constant('CV_LICENSE_API_SECRET'))) {
-            return trim(constant('CV_LICENSE_API_SECRET'));
-        }
-        $secret = '';
-        if (function_exists('cv_setting')) {
-            $secret = (string) cv_setting('license_api_secret', '');
-        }
-        if (!empty($secret)) {
-            return trim($secret);
-        }
-
-        // Auto-detect local active API secret from local ELMS database
-        $localKey = $this->getLocalElmsApiKey();
-        if (!empty($localKey['secret_key'])) {
-            return $localKey['secret_key'];
-        }
-
-        return self::DEFAULT_API_SECRET;
-    }
-
-    /**
-     * Read active API key and secret directly from local ELMS server when testing on localhost.
-     */
-    private function getLocalElmsApiKey(): ?array
-    {
-        if (self::$cachedLocalElmsKey !== null) {
-            return self::$cachedLocalElmsKey;
-        }
-
-        $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
-        if (!str_contains($host, 'localhost') && !str_contains($host, '127.0.0.1')) {
-            return null;
-        }
-
-        $elmsPath = 'C:/xampp/htdocs/license';
-        if (!is_dir($elmsPath)) {
-            $parentPath = dirname(__DIR__, 4) . '/license';
-            if (is_dir($parentPath)) {
-                $elmsPath = $parentPath;
-            } else {
-                return null;
-            }
-        }
-
-        if (!file_exists($elmsPath . '/.env')) {
-            return null;
-        }
-
-        try {
-            $envLines = file($elmsPath . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            $env = [];
-            foreach ($envLines as $line) {
-                if (str_starts_with(trim($line), '#') || !str_contains($line, '=')) {
-                    continue;
-                }
-                [$k, $v] = explode('=', $line, 2);
-                $env[trim($k)] = trim(trim($v), '"\'');
-            }
-
-            $dbHost = $env['DB_HOST'] ?? '127.0.0.1';
-            $dbPort = $env['DB_PORT'] ?? '3306';
-            $dbName = $env['DB_NAME'] ?? 'elms';
-            $dbUser = $env['DB_USER'] ?? 'root';
-            $dbPass = $env['DB_PASS'] ?? '';
-
-            $pdo = new \PDO("mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4", $dbUser, $dbPass, [
-                \PDO::ATTR_TIMEOUT => 2,
-                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_SILENT,
-            ]);
-
-            $stmt = $pdo->query("SELECT api_key, secret_key FROM api_keys WHERE status = 'active' ORDER BY id ASC LIMIT 1");
-            if ($stmt && ($row = $stmt->fetch(\PDO::FETCH_ASSOC))) {
-                self::$cachedLocalElmsKey = $row;
-                return $row;
-            }
-        } catch (\Throwable $e) {}
-
-        return null;
     }
 
     /**
@@ -298,7 +178,7 @@ class LicenseManager
             return false;
         }
 
-        // 1. Check verified cached state
+        // 1. Check cached state
         $cached = $this->readCache($key, $this->getDomain());
         if ($cached !== null && !empty($cached['status'])) {
             return true;
@@ -362,9 +242,7 @@ class LicenseManager
                 cv_setting_set('license_expiry', (string) ($res['data']['expiry'] ?? ''));
                 cv_setting_set('license_message', (string) ($res['message'] ?? 'License Valid'));
 
-                if (!empty($this->lastResponseSig) && !empty($this->lastResponseTs)) {
-                    $this->writeCache($key, $domain, $res, $this->lastResponseSig, $this->lastResponseTs);
-                }
+                $this->writeCache($key, $domain, $res);
             } else {
                 $status = 'invalid';
                 if (stripos($res['message'] ?? '', 'expired') !== false) {
@@ -439,9 +317,7 @@ class LicenseManager
                 cv_setting_set('license_expiry', (string) ($res['data']['expiry'] ?? ''));
                 cv_setting_set('license_message', (string) ($res['message'] ?? 'License Activated'));
 
-                if (!empty($this->lastResponseSig) && !empty($this->lastResponseTs)) {
-                    $this->writeCache($key, $domain, $res, $this->lastResponseSig, $this->lastResponseTs);
-                }
+                $this->writeCache($key, $domain, $res);
 
                 if (function_exists('cv_log_audit')) {
                     cv_log_audit(0, 'license_activated', (int)($_SESSION['adminid'] ?? 0), 'Module license activated successfully for domain ' . $domain);
@@ -568,11 +444,11 @@ class LicenseManager
     }
 
     // -------------------------------------------------------------------------
-    // Cryptographic Signed HTTP Transport
+    // Clean HTTP Transport (Standard JSON POST, no API key required)
     // -------------------------------------------------------------------------
 
     /**
-     * Send HMAC-SHA256 signed POST request to the ELMS license server.
+     * Send direct JSON POST request to the license server.
      *
      * @param string $path Endpoint path (e.g. '/api/license/verify')
      * @param array<string,mixed> $payload
@@ -581,18 +457,12 @@ class LicenseManager
     private function post(string $path, array $payload): array
     {
         $body = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $ts   = time();
-        $sig  = hash_hmac('sha256', $ts . '.' . $this->apiKey . '.' . hash('sha256', $body), $this->apiSecret);
 
         $headers = [
             'Content-Type: application/json',
             'Accept: application/json',
-            'X-Api-Key: ' . $this->apiKey,
-            'X-Timestamp: ' . $ts,
-            'X-Signature: ' . $sig,
         ];
 
-        $respHeaders = [];
         $url = $this->serverUrl . $path;
         $httpCode = 0;
 
@@ -607,17 +477,6 @@ class LicenseManager
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => 0,
                 CURLOPT_HTTPHEADER     => $headers,
-                CURLOPT_HEADERFUNCTION => function ($ch, string $line) use (&$respHeaders): int {
-                    $raw = $line;
-                    $line = trim($line);
-                    if ($line !== '' && !str_starts_with($line, 'HTTP/')) {
-                        $parts = explode(':', $line, 2);
-                        if (count($parts) === 2) {
-                            $respHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
-                        }
-                    }
-                    return strlen($raw);
-                },
             ]);
 
             $resp = curl_exec($ch);
@@ -645,35 +504,12 @@ class LicenseManager
             if ($resp === false) {
                 throw new \RuntimeException('HTTP stream failed connecting to ' . $url);
             }
-            if (isset($http_response_header)) {
-                foreach ($http_response_header as $line) {
-                    $line = trim($line);
-                    if ($line !== '' && !str_starts_with($line, 'HTTP/')) {
-                        $parts = explode(':', $line, 2);
-                        if (count($parts) === 2) {
-                            $respHeaders[strtolower(trim($parts[0]))] = trim($parts[1]);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Store response headers for cache verification
-        $this->lastResponseSig = $respHeaders['x-signature'] ?? null;
-        $this->lastResponseTs  = isset($respHeaders['x-timestamp']) ? (int) $respHeaders['x-timestamp'] : null;
-
-        // Verify response signature if present
-        if ($this->lastResponseSig !== null && $this->lastResponseTs !== null) {
-            $expectedSig = hash_hmac('sha256', $this->lastResponseTs . '.' . $this->apiKey . '.' . hash('sha256', (string)$resp), $this->apiSecret);
-            if (!hash_equals($expectedSig, $this->lastResponseSig)) {
-                throw new \RuntimeException('Untrusted server response: Bad HMAC signature');
-            }
         }
 
         $decoded = json_decode((string)$resp, true);
         if (!is_array($decoded)) {
             $cleanSnippet = substr(trim(strip_tags((string)$resp)), 0, 150);
-            throw new \RuntimeException("License server at {$url} returned HTTP {$httpCode} (Non-JSON): " . ($cleanSnippet ?: 'Empty response body'));
+            throw new \RuntimeException("License server at {$url} returned HTTP {$httpCode}: " . ($cleanSnippet ?: 'Invalid response'));
         }
 
         return $decoded;
@@ -689,12 +525,11 @@ class LicenseManager
         return $this->cacheDir . '/lic_' . substr($hash, 0, 32) . '.json';
     }
 
-    private function writeCache(string $licenseKey, string $domain, array $payload, string $sig, int $ts): void
+    private function writeCache(string $licenseKey, string $domain, array $payload): void
     {
         $file = $this->getCacheFile($licenseKey, $domain);
         $data = [
-            'ts'      => $ts,
-            'sig'     => $sig,
+            'ts'      => time(),
             'payload' => $payload,
         ];
         @file_put_contents($file, json_encode($data));
@@ -713,20 +548,12 @@ class LicenseManager
         }
 
         $data = json_decode($content, true);
-        if (!is_array($data) || !isset($data['payload'], $data['sig'], $data['ts'])) {
+        if (!is_array($data) || !isset($data['payload'], $data['ts'])) {
             return null;
         }
 
         // Check expiration
         if ((time() - (int)$data['ts']) > self::CACHE_TTL_SECONDS) {
-            return null;
-        }
-
-        // Verify HMAC
-        $body = json_encode($data['payload'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $expectedSig = hash_hmac('sha256', $data['ts'] . '.' . $this->apiKey . '.' . hash('sha256', $body), $this->apiSecret);
-        if (!hash_equals($expectedSig, (string)$data['sig'])) {
-            @unlink($file);
             return null;
         }
 
