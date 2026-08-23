@@ -15,7 +15,7 @@ use Illuminate\Database\Capsule\Manager as Capsule;
  */
 class LicenseManager
 {
-    public const DEFAULT_SERVER_URL  = 'https://lic.hostnibo.com';
+    public const DEFAULT_SERVER_URL  = 'https://' . 'lic' . '.hostnibo.' . 'com';
     public const DEFAULT_PRODUCT_KEY = 'ADVANCED-CLIENT-VERIFICATION';
     public const CACHE_TTL_SECONDS   = 900; // 15 minutes offline fallback for client area checkout
 
@@ -62,7 +62,7 @@ class LicenseManager
     }
 
     /**
-     * Resolve Server URL: supports custom DB setting, constant, local environment auto-detection, and production default.
+     * Resolve Server URL: supports custom DB setting, constant, and production default.
      */
     public function resolveServerUrl(): string
     {
@@ -88,15 +88,7 @@ class LicenseManager
             return rtrim($url, '/');
         }
 
-        // 3. Auto-detect local development environment on localhost / 127.0.0.1
-        $host = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
-        if (str_contains($host, 'localhost') || str_contains($host, '127.0.0.1')) {
-            if (is_dir('C:/xampp/htdocs/license') || is_dir(dirname(__DIR__, 4) . '/license')) {
-                return 'http://localhost/license/public';
-            }
-        }
-
-        // 4. Default production license server
+        // 3. Default production license server
         return self::DEFAULT_SERVER_URL;
     }
 
@@ -534,7 +526,7 @@ class LicenseManager
             curl_close($ch);
 
             if ($resp === false) {
-                throw new \RuntimeException('cURL error connecting to ' . $url . ': ' . $err);
+                throw new \RuntimeException('License verification network error: ' . $err);
             }
         } else {
             $ctx = stream_context_create([
@@ -551,14 +543,14 @@ class LicenseManager
             ]);
             $resp = @file_get_contents($url, false, $ctx);
             if ($resp === false) {
-                throw new \RuntimeException('HTTP stream failed connecting to ' . $url);
+                throw new \RuntimeException('License verification connection failed.');
             }
         }
 
         $decoded = json_decode((string)$resp, true);
         if (!is_array($decoded)) {
             $cleanSnippet = substr(trim(strip_tags((string)$resp)), 0, 150);
-            throw new \RuntimeException("License server at {$url} returned HTTP {$httpCode}: " . ($cleanSnippet ?: 'Invalid response'));
+            throw new \RuntimeException("License verification service returned HTTP {$httpCode}: " . ($cleanSnippet ?: 'Invalid response'));
         }
 
         return $decoded;

@@ -93,7 +93,7 @@ if (!function_exists('cv_insert_default_settings')) {
             'mail_admin_info_response' => 'yes',
             'admin_notification_emails' => '',
             'license_key' => '',
-            'license_server_url' => 'https://lic.hostnibo.com',
+            'license_server_url' => '',
             'license_product_key' => 'ADVANCED-CLIENT-VERIFICATION',
             'license_status' => 'unlicensed',
             'license_last_check' => '0',
