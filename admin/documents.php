@@ -17,6 +17,9 @@ if (isset($_GET['download']) && is_numeric($_GET['download'])) {
             $config['encryption_key'] ?? ''
         );
         $content = $storage->read($doc->storage_path, (bool) $doc->encrypted);
+        if ($content === null && !empty($doc->stored_filename)) {
+            $content = $storage->read($doc->stored_filename, (bool) $doc->encrypted);
+        }
         if ($content !== null) {
             $isDownload = ($_GET['mode'] ?? '') === 'download';
             $disposition = $isDownload ? 'attachment' : 'inline';

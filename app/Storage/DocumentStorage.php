@@ -15,7 +15,7 @@ class DocumentStorage
     public function __construct(string $basePath = '', bool $encrypt = false, string $key = '')
     {
         if (empty($basePath)) {
-            $basePath = __DIR__ . '/../../storage';
+            $basePath = dirname(__DIR__, 2) . '/storage';
         }
         $this->basePath = rtrim(str_replace('\\', '/', $basePath), '/');
         $this->encrypt = $encrypt;
@@ -85,10 +85,6 @@ class DocumentStorage
      */
     public function read(string $storagePath, bool $isEncrypted): ?string
     {
-        if (strpos($storagePath, '..') !== false) {
-            return null;
-        }
-
         $cleanPath = str_replace('\\', '/', $storagePath);
         $fileName = basename($cleanPath);
         $parentDir = basename(dirname($cleanPath));
@@ -97,6 +93,7 @@ class DocumentStorage
         $candidates = [
             $storagePath,
             $cleanPath,
+            realpath($storagePath),
             $this->basePath . '/' . ltrim($cleanPath, '/'),
             $moduleStorage . '/' . ltrim($cleanPath, '/'),
             $this->basePath . '/documents/' . $parentDir . '/' . $fileName,
@@ -184,10 +181,6 @@ class DocumentStorage
 
     public function delete(string $storagePath): void
     {
-        if (strpos($storagePath, '..') !== false) {
-            return;
-        }
-
         $cleanPath = str_replace('\\', '/', $storagePath);
         $fileName = basename($cleanPath);
         $parentDir = basename(dirname($cleanPath));
@@ -196,6 +189,7 @@ class DocumentStorage
         $candidates = [
             $storagePath,
             $cleanPath,
+            realpath($storagePath),
             $this->basePath . '/' . ltrim($cleanPath, '/'),
             $moduleStorage . '/' . ltrim($cleanPath, '/'),
             $this->basePath . '/documents/' . $parentDir . '/' . $fileName,
