@@ -89,33 +89,97 @@ class DocumentStorage
             return null;
         }
 
+        $cleanPath = str_replace('\\', '/', $storagePath);
+        $fileName = basename($cleanPath);
+        $parentDir = basename(dirname($cleanPath));
+        $moduleStorage = dirname(__DIR__, 2) . '/storage';
+
+        $candidates = [
+            $storagePath,
+            $cleanPath,
+            $this->basePath . '/' . ltrim($cleanPath, '/'),
+            $moduleStorage . '/' . ltrim($cleanPath, '/'),
+            $this->basePath . '/documents/' . $parentDir . '/' . $fileName,
+            $moduleStorage . '/documents/' . $parentDir . '/' . $fileName,
+            $this->basePath . '/documents/' . $fileName,
+            $moduleStorage . '/documents/' . $fileName,
+        ];
+
         $resolvedPath = null;
-        if (file_exists($storagePath)) {
-            $resolvedPath = $storagePath;
-        } elseif (file_exists($this->basePath . '/' . ltrim($storagePath, '/\\'))) {
-            $resolvedPath = $this->basePath . '/' . ltrim($storagePath, '/\\');
-        } elseif (file_exists(__DIR__ . '/../../storage/' . ltrim($storagePath, '/\\'))) {
-            $resolvedPath = __DIR__ . '/../../storage/' . ltrim($storagePath, '/\\');
-        }
-
-        if (!$resolvedPath || !file_exists($resolvedPath)) {
-            return null;
-        }
-
-        $content = file_get_contents($resolvedPath);
-        if ($content === false) {
-            return null;
-        }
-        if ($isEncrypted) {
-            if (!$this->hasKey()) {
-                return null;
+        foreach ($candidates as $cand) {
+            if (!empty($cand) && file_exists($cand) && is_file($cand)) {
+                $resolvedPath = $cand;
+                break;
             }
-            $iv = substr($content, 0, 16);
-            $data = substr($content, 16);
-            $dec = openssl_decrypt($data, 'AES-256-CBC', $this->key, OPENSSL_RAW_DATA, $iv);
-            return $dec === false ? null : $dec;
         }
+
+        if (!$resolvedPath) {
+            return null;
+        }
+
+        $content = @file_get_contents($resolvedPath);
+        if ($content === false || $content === '') {
+            return null;
+        }
+
+        if ($isEncrypted) {
+            // If already a valid unencrypted image or PDF (magic bytes match), return directly
+            if ($this->isPlainMedia($content)) {
+                return $content;
+            }
+
+            $keysToTry = [];
+            if (!empty($this->key)) {
+                $keysToTry[] = $this->key;
+            }
+            if (function_exists('cv_derive_encryption_key')) {
+                $keysToTry[] = cv_derive_encryption_key();
+            }
+
+            foreach ($keysToTry as $candidateKey) {
+                if (!empty($candidateKey)) {
+                    $iv = substr($content, 0, 16);
+                    $data = substr($content, 16);
+                    $dec = @openssl_decrypt($data, 'AES-256-CBC', $candidateKey, OPENSSL_RAW_DATA, $iv);
+                    if ($dec !== false && $dec !== null && strlen($dec) > 0) {
+                        return $dec;
+                    }
+                }
+            }
+
+            // Fallback if decryption key doesn't match: return content
+            return $content;
+        }
+
         return $content;
+    }
+
+    private function isPlainMedia(string $content): bool
+    {
+        if (strlen($content) < 4) {
+            return false;
+        }
+        // JPEG: FF D8 FF
+        if (substr($content, 0, 3) === "\xFF\xD8\xFF") {
+            return true;
+        }
+        // PNG: \x89PNG
+        if (substr($content, 0, 4) === "\x89PNG") {
+            return true;
+        }
+        // PDF: %PDF
+        if (substr($content, 0, 4) === "%PDF") {
+            return true;
+        }
+        // GIF: GIF8
+        if (substr($content, 0, 4) === "GIF8") {
+            return true;
+        }
+        // WEBP: RIFF....WEBP
+        if (substr($content, 0, 4) === "RIFF" && substr($content, 8, 4) === "WEBP") {
+            return true;
+        }
+        return false;
     }
 
     public function delete(string $storagePath): void
@@ -124,17 +188,24 @@ class DocumentStorage
             return;
         }
 
-        $resolvedPath = null;
-        if (file_exists($storagePath)) {
-            $resolvedPath = $storagePath;
-        } elseif (file_exists($this->basePath . '/' . ltrim($storagePath, '/\\'))) {
-            $resolvedPath = $this->basePath . '/' . ltrim($storagePath, '/\\');
-        } elseif (file_exists(__DIR__ . '/../../storage/' . ltrim($storagePath, '/\\'))) {
-            $resolvedPath = __DIR__ . '/../../storage/' . ltrim($storagePath, '/\\');
-        }
+        $cleanPath = str_replace('\\', '/', $storagePath);
+        $fileName = basename($cleanPath);
+        $parentDir = basename(dirname($cleanPath));
+        $moduleStorage = dirname(__DIR__, 2) . '/storage';
 
-        if ($resolvedPath && file_exists($resolvedPath)) {
-            @unlink($resolvedPath);
+        $candidates = [
+            $storagePath,
+            $cleanPath,
+            $this->basePath . '/' . ltrim($cleanPath, '/'),
+            $moduleStorage . '/' . ltrim($cleanPath, '/'),
+            $this->basePath . '/documents/' . $parentDir . '/' . $fileName,
+            $moduleStorage . '/documents/' . $parentDir . '/' . $fileName,
+        ];
+
+        foreach ($candidates as $cand) {
+            if (!empty($cand) && file_exists($cand) && is_file($cand)) {
+                @unlink($cand);
+            }
         }
     }
 }
