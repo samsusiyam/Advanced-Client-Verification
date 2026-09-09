@@ -185,46 +185,33 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
 
     <!-- License Information Grid -->
     <div style="padding: 24px 28px;">
-        <div class="row">
-            <div class="col-md-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">License Key</div>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span id="cv-lic-key-display" style="font-family: monospace; font-size: 15px; font-weight: 700; color: #1e293b;">
-                            <?php echo htmlspecialchars($details['masked_key'] ?: 'None configured'); ?>
-                        </span>
-                        <?php if (!empty($details['license_key'])): ?>
-                            <button type="button" class="btn btn-xs btn-default" onclick="toggleLicKey()" title="Show/Hide Key">
-                                <i class="fa fa-eye" id="cv-lic-eye"></i>
-                            </button>
-                        <?php endif; ?>
+        <div class="row" style="display: flex; flex-wrap: wrap;">
+            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; height: 100%;">
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Registered Domain</div>
+                    <div style="font-size: 14px; font-weight: 600; color: #0f172a; word-break: break-all; display: flex; align-items: center; gap: 7px;">
+                        <i class="fa fa-globe" style="color: #3b82f6; font-size: 15px;"></i>
+                        <span><?php echo htmlspecialchars($details['domain']); ?></span>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Registered Domain</div>
-                    <div style="font-size: 14px; font-weight: 600; color: #0f172a; word-break: break-all;">
-                        <i class="fa fa-globe" style="color: #3b82f6;"></i> <?php echo htmlspecialchars($details['domain']); ?>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; height: 100%;">
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Server IP</div>
+                    <div style="font-size: 14px; font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 7px;">
+                        <i class="fa fa-server" style="color: #6366f1; font-size: 14px;"></i>
+                        <span><?php echo htmlspecialchars($details['ip']); ?></span>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Server IP</div>
-                    <div style="font-size: 14px; font-weight: 600; color: #0f172a;">
-                        <i class="fa fa-server" style="color: #6366f1;"></i> <?php echo htmlspecialchars($details['ip']); ?>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Expiry Date</div>
-                    <div style="font-size: 13px; font-weight: 600; color: <?php echo $status === 'expired' ? '#dc2626' : ($details['expiry_date'] === 'Lifetime / Ongoing' ? '#16a34a' : '#0f172a'); ?>;">
-                        <i class="fa fa-calendar"></i> <?php echo htmlspecialchars($details['expiry_date']); ?>
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; height: 100%;">
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Expiry Date</div>
+                    <div style="font-size: 13px; font-weight: 600; color: <?php echo $status === 'expired' ? '#dc2626' : ($details['expiry_date'] === 'Lifetime / Ongoing' ? '#16a34a' : '#0f172a'); ?>; display: flex; align-items: center; gap: 7px;">
+                        <i class="fa fa-calendar-check-o" style="color: #059669; font-size: 14px;"></i>
+                        <span><?php echo htmlspecialchars($details['expiry_date']); ?></span>
                         <?php if ($status === 'expired'): ?>
                             <span class="label label-danger" style="font-size: 10px; margin-left: 4px;">Expired</span>
                         <?php endif; ?>
@@ -232,11 +219,21 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
                 </div>
             </div>
 
-            <div class="col-md-9 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Server Verification Message</div>
-                    <div style="font-size: 13px; font-weight: 600; color: <?php echo $isLicensed ? '#16a34a' : '#dc2626'; ?>;">
-                        <i class="fa <?php echo $isLicensed ? 'fa-check' : 'fa-info-circle'; ?>"></i> <?php echo htmlspecialchars($details['message'] ?: ($isLicensed ? 'License active and valid.' : 'Unlicensed install')); ?>
+            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; height: 100%;">
+                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Server Verification</div>
+                    <div>
+                        <?php if ($isLicensed): ?>
+                            <span style="display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+                                <i class="fa fa-check-circle" style="color: #10b981;"></i>
+                                <?php echo htmlspecialchars($details['message'] ?: 'License Valid'); ?>
+                            </span>
+                        <?php else: ?>
+                            <span style="display: inline-flex; align-items: center; gap: 6px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+                                <i class="fa fa-exclamation-circle" style="color: #ef4444;"></i>
+                                <?php echo htmlspecialchars($details['message'] ?: 'Unlicensed Install'); ?>
+                            </span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -306,23 +303,3 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
     </div>
 </div>
 
-<script>
-var isFullKeyShown = false;
-var fullKey = <?php echo json_encode($details['license_key']); ?>;
-var maskedKey = <?php echo json_encode($details['masked_key'] ?: 'None configured'); ?>;
-
-function toggleLicKey() {
-    var elem = document.getElementById('cv-lic-key-display');
-    var icon = document.getElementById('cv-lic-eye');
-    if (!elem) return;
-    if (isFullKeyShown) {
-        elem.textContent = maskedKey;
-        if (icon) icon.className = 'fa fa-eye';
-        isFullKeyShown = false;
-    } else {
-        elem.textContent = fullKey;
-        if (icon) icon.className = 'fa fa-eye-slash';
-        isFullKeyShown = true;
-    }
-}
-</script>

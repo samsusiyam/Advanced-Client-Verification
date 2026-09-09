@@ -23,14 +23,38 @@ if (isset($_GET['download']) && is_numeric($_GET['download'])) {
             );
             $content = $storage->read($doc->storage_path, (bool) $doc->encrypted);
             if ($content !== null) {
-                header('Content-Type: ' . Sanitizer::headerValue($doc->mime_type));
+                while (ob_get_level() > 0) {
+                    @ob_end_clean();
+                }
+
+                $mimeType = $doc->mime_type ?: '';
+                if (empty($mimeType) || $mimeType === 'application/octet-stream') {
+                    $ext = strtolower(pathinfo($doc->original_filename, PATHINFO_EXTENSION));
+                    $mimes = [
+                        'jpg' => 'image/jpeg',
+                        'jpeg' => 'image/jpeg',
+                        'png' => 'image/png',
+                        'gif' => 'image/gif',
+                        'webp' => 'image/webp',
+                        'pdf' => 'application/pdf',
+                        'svg' => 'image/svg+xml',
+                    ];
+                    $mimeType = $mimes[$ext] ?? 'application/octet-stream';
+                }
+
+                header('Content-Type: ' . Sanitizer::headerValue($mimeType));
                 header('Content-Disposition: inline; filename="' . Sanitizer::headerValue($doc->original_filename) . '"');
                 header('X-Content-Type-Options: nosniff');
+                header('Cache-Control: private, max-age=3600, must-revalidate');
+                header('Pragma: no-cache');
                 header('Content-Length: ' . strlen($content));
                 echo $content;
                 exit;
             }
         }
+    }
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
     }
     http_response_code(403);
     exit;

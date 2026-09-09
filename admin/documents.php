@@ -20,16 +20,41 @@ if (isset($_GET['download']) && is_numeric($_GET['download'])) {
         if ($content !== null) {
             $isDownload = ($_GET['mode'] ?? '') === 'download';
             $disposition = $isDownload ? 'attachment' : 'inline';
-            header('Content-Type: ' . Sanitizer::headerValue($doc->mime_type ?: 'application/octet-stream'));
+
+            while (ob_get_level() > 0) {
+                @ob_end_clean();
+            }
+
+            $mimeType = $doc->mime_type ?: '';
+            if (empty($mimeType) || $mimeType === 'application/octet-stream') {
+                $ext = strtolower(pathinfo($doc->original_filename, PATHINFO_EXTENSION));
+                $mimes = [
+                    'jpg' => 'image/jpeg',
+                    'jpeg' => 'image/jpeg',
+                    'png' => 'image/png',
+                    'gif' => 'image/gif',
+                    'webp' => 'image/webp',
+                    'pdf' => 'application/pdf',
+                    'svg' => 'image/svg+xml',
+                ];
+                $mimeType = $mimes[$ext] ?? 'application/octet-stream';
+            }
+
+            header('Content-Type: ' . Sanitizer::headerValue($mimeType));
             header('Content-Disposition: ' . $disposition . '; filename="' . Sanitizer::headerValue($doc->original_filename) . '"');
             header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, max-age=3600, must-revalidate');
+            header('Pragma: no-cache');
             header('Content-Length: ' . strlen($content));
             echo $content;
             exit;
         }
     }
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
     http_response_code(404);
-    echo 'Document file not found';
+    echo 'Document file not found or inaccessible.';
     exit;
 }
 
@@ -393,32 +418,66 @@ function cvOpenDocModal(docId, docTitle, filename, fileSize, mimeType) {
     var loaderElem = document.getElementById('cv_modal_loader');
     var downloadBtn = document.getElementById('cv_modal_download_btn');
 
-    var viewUrl = 'addonmodules.php?module=clientverification&action=documents&download=' + docId + '&mode=inline';
+    var viewUrl = 'addonmodules.php?module=clientverification&action=documents&download=' + docId + '&mode=inline&t=' + new Date().getTime();
     var downloadUrl = 'addonmodules.php?module=clientverification&action=documents&download=' + docId + '&mode=download';
 
     titleElem.textContent = docTitle;
     metaElem.textContent = 'File: ' + filename + ' • Size: ' + fileSize;
     downloadBtn.href = downloadUrl;
 
-    if (loaderElem) loaderElem.style.display = 'block';
-    if (imgElem) imgElem.style.display = 'none';
-    if (iframeElem) iframeElem.style.display = 'none';
+    if (loaderElem) {
+        loaderElem.innerHTML = '<i class="fa fa-spinner fa-spin fa-2x"></i><br><span style="display: inline-block; margin-top: 8px;">Loading document preview...</span>';
+        loaderElem.style.display = 'block';
+    }
+    if (imgElem) {
+        imgElem.style.display = 'none';
+        imgElem.onload = null;
+        imgElem.onerror = null;
+        imgElem.src = '';
+    }
+    if (iframeElem) {
+        iframeElem.style.display = 'none';
+        iframeElem.onload = null;
+        iframeElem.src = '';
+    }
 
-    if (mimeType && mimeType.indexOf('pdf') !== -1) {
-        iframeElem.src = viewUrl;
+    var cleanName = (filename || '').toLowerCase();
+    var ext = cleanName.indexOf('.') !== -1 ? cleanName.split('.').pop() : '';
+    var isPdf = (mimeType && mimeType.indexOf('pdf') !== -1) || ext === 'pdf';
+    var isImage = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'svg'].indexOf(ext) !== -1 || (mimeType && mimeType.indexOf('image/') !== -1);
+
+    if (isPdf) {
         iframeElem.onload = function() {
             if (loaderElem) loaderElem.style.display = 'none';
             iframeElem.style.display = 'block';
         };
-    } else {
-        imgElem.src = viewUrl;
+        iframeElem.onerror = function() {
+            if (loaderElem) {
+                loaderElem.innerHTML = '<span style="color: #f87171;"><i class="fa fa-exclamation-triangle"></i> Failed to preview PDF. Please use the download button below.</span>';
+                loaderElem.style.display = 'block';
+            }
+        };
+        iframeElem.src = viewUrl;
+    } else if (isImage || (!mimeType && ext !== 'pdf')) {
         imgElem.onload = function() {
             if (loaderElem) loaderElem.style.display = 'none';
             imgElem.style.display = 'inline-block';
         };
         imgElem.onerror = function() {
-            if (loaderElem) loaderElem.innerHTML = '<span style="color: #f87171;"><i class="fa fa-exclamation-triangle"></i> Failed to preview document image. Please use the download button below.</span>';
+            if (!imgElem.getAttribute('src') || imgElem.src === '' || imgElem.src === window.location.href) {
+                return;
+            }
+            if (loaderElem) {
+                loaderElem.innerHTML = '<span style="color: #f87171;"><i class="fa fa-exclamation-triangle"></i> Failed to preview document image. Please use the download button below.</span>';
+                loaderElem.style.display = 'block';
+            }
         };
+        imgElem.src = viewUrl;
+    } else {
+        if (loaderElem) {
+            loaderElem.innerHTML = '<span style="color: #94a3b8;"><i class="fa fa-file-text-o fa-2x"></i><br><span style="display:inline-block; margin-top: 8px;">Inline preview not supported for <strong>.' + (ext || 'unknown') + '</strong> files.<br>Please use the Download button below.</span></span>';
+            loaderElem.style.display = 'block';
+        }
     }
 
     modal.style.display = 'block';
@@ -429,8 +488,22 @@ function cvCloseDocModal() {
     var modal = document.getElementById('cv_doc_preview_modal');
     var iframeElem = document.getElementById('cv_modal_iframe');
     var imgElem = document.getElementById('cv_modal_img');
-    if (iframeElem) iframeElem.src = '';
-    if (imgElem) imgElem.src = '';
+    var loaderElem = document.getElementById('cv_modal_loader');
+
+    if (iframeElem) {
+        iframeElem.onload = null;
+        iframeElem.src = '';
+        iframeElem.style.display = 'none';
+    }
+    if (imgElem) {
+        imgElem.onload = null;
+        imgElem.onerror = null;
+        imgElem.src = '';
+        imgElem.style.display = 'none';
+    }
+    if (loaderElem) {
+        loaderElem.innerHTML = '<i class="fa fa-spinner fa-spin fa-2x"></i><br><span style="display: inline-block; margin-top: 8px;">Loading document preview...</span>';
+    }
     if (modal) modal.style.display = 'none';
     document.body.style.overflow = '';
 }

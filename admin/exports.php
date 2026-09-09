@@ -10,6 +10,10 @@ if (isset($_GET['download']) && $_GET['download'] === 'csv') {
         ->orderByDesc('mod_cv_verifications.id')
         ->get();
 
+    while (ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="cv_verifications_' . date('Ymd_His') . '.csv"');
 

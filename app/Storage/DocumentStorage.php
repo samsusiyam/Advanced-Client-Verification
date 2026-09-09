@@ -85,20 +85,45 @@ class DocumentStorage
      */
     public function read(string $storagePath, bool $isEncrypted): ?string
     {
-        if (!file_exists($storagePath)) {
+        $resolvedPath = null;
+        if (file_exists($storagePath)) {
+            $resolvedPath = $storagePath;
+        } elseif (file_exists($this->basePath . '/' . ltrim($storagePath, '/\\'))) {
+            $resolvedPath = $this->basePath . '/' . ltrim($storagePath, '/\\');
+        } elseif (file_exists(__DIR__ . '/../../storage/' . ltrim($storagePath, '/\\'))) {
+            $resolvedPath = __DIR__ . '/../../storage/' . ltrim($storagePath, '/\\');
+        }
+
+        if (!$resolvedPath || !file_exists($resolvedPath)) {
             return null;
         }
-        $realBase = realpath($this->basePath);
-        $realPath = realpath($storagePath);
-        if ($realPath === false || $realBase === false) {
+
+        $realPath = realpath($resolvedPath);
+        if ($realPath === false) {
             return null;
         }
-        $normBase = rtrim(str_replace('\\', '/', strtolower($realBase)), '/') . '/';
+
+        // Validate that realPath is within an allowed base directory (prevent directory traversal)
+        $allowedBases = [
+            realpath($this->basePath),
+            realpath(__DIR__ . '/../../storage'),
+        ];
         $normPath = str_replace('\\', '/', strtolower($realPath));
-        if (strpos($normPath, $normBase) !== 0) {
+        $isSafe = false;
+        foreach ($allowedBases as $base) {
+            if ($base !== false) {
+                $normBase = rtrim(str_replace('\\', '/', strtolower($base)), '/') . '/';
+                if (strpos($normPath, $normBase) === 0) {
+                    $isSafe = true;
+                    break;
+                }
+            }
+        }
+        if (!$isSafe) {
             return null;
         }
-        $content = file_get_contents($storagePath);
+
+        $content = file_get_contents($realPath);
         if ($content === false) {
             return null;
         }
@@ -116,8 +141,17 @@ class DocumentStorage
 
     public function delete(string $storagePath): void
     {
+        $resolvedPath = null;
         if (file_exists($storagePath)) {
-            @unlink($storagePath);
+            $resolvedPath = $storagePath;
+        } elseif (file_exists($this->basePath . '/' . ltrim($storagePath, '/\\'))) {
+            $resolvedPath = $this->basePath . '/' . ltrim($storagePath, '/\\');
+        } elseif (file_exists(__DIR__ . '/../../storage/' . ltrim($storagePath, '/\\'))) {
+            $resolvedPath = __DIR__ . '/../../storage/' . ltrim($storagePath, '/\\');
+        }
+
+        if ($resolvedPath && file_exists($resolvedPath)) {
+            @unlink($resolvedPath);
         }
     }
 }
