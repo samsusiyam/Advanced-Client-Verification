@@ -90,6 +90,17 @@ function clientverification_output($vars)
 {
     $action = $_GET['action'] ?? 'dashboard';
 
+    // Instant document streaming for modal previews & downloads (avoids blocking migrations and overhead)
+    if (isset($_GET['download']) && is_numeric($_GET['download'])) {
+        if ($action === 'verification') {
+            require __DIR__ . '/admin/verification.php';
+            return;
+        } elseif ($action === 'documents') {
+            require __DIR__ . '/admin/documents.php';
+            return;
+        }
+    }
+
     // Sync license key from addon settings if present
     if (!empty($vars['license_key'])) {
         $storedKey = cv_setting('license_key', '');

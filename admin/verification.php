@@ -519,7 +519,14 @@ $audit = json_decode($row->audit_log ?? '[]', true);
 </div>
 
 <script>
+var cvModalTimer = null;
+
 function cvOpenDocModal(docId, docTitle, filename, fileSize, mimeType) {
+    if (cvModalTimer) {
+        clearTimeout(cvModalTimer);
+        cvModalTimer = null;
+    }
+
     var modal = document.getElementById('cv_doc_preview_modal');
     var titleElem = document.getElementById('cv_modal_title');
     var metaElem = document.getElementById('cv_modal_meta');
@@ -541,13 +548,10 @@ function cvOpenDocModal(docId, docTitle, filename, fileSize, mimeType) {
     }
     if (imgElem) {
         imgElem.style.display = 'none';
-        imgElem.onload = null;
-        imgElem.onerror = null;
         imgElem.src = '';
     }
     if (iframeElem) {
         iframeElem.style.display = 'none';
-        iframeElem.onload = null;
         iframeElem.src = '';
     }
 
@@ -558,31 +562,43 @@ function cvOpenDocModal(docId, docTitle, filename, fileSize, mimeType) {
 
     if (isPdf) {
         iframeElem.onload = function() {
+            if (cvModalTimer) clearTimeout(cvModalTimer);
             if (loaderElem) loaderElem.style.display = 'none';
             iframeElem.style.display = 'block';
         };
-        iframeElem.onerror = function() {
-            if (loaderElem) {
-                loaderElem.innerHTML = '<span style="color: #f87171;"><i class="fa fa-exclamation-triangle"></i> Failed to preview PDF. Please use the download button below.</span>';
-                loaderElem.style.display = 'block';
-            }
-        };
         iframeElem.src = viewUrl;
+
+        // PDF fallback timer if iframe onload doesn't fire
+        cvModalTimer = setTimeout(function() {
+            if (loaderElem && loaderElem.style.display !== 'none') {
+                loaderElem.style.display = 'none';
+                iframeElem.style.display = 'block';
+            }
+        }, 2000);
     } else if (isImage || (!mimeType && ext !== 'pdf')) {
-        imgElem.onload = function() {
+        var tempImg = new Image();
+        tempImg.onload = function() {
+            if (cvModalTimer) clearTimeout(cvModalTimer);
+            imgElem.src = viewUrl;
             if (loaderElem) loaderElem.style.display = 'none';
             imgElem.style.display = 'inline-block';
         };
-        imgElem.onerror = function() {
-            if (!imgElem.getAttribute('src') || imgElem.src === '' || imgElem.src === window.location.href) {
-                return;
-            }
+        tempImg.onerror = function() {
+            if (cvModalTimer) clearTimeout(cvModalTimer);
             if (loaderElem) {
                 loaderElem.innerHTML = '<span style="color: #f87171;"><i class="fa fa-exclamation-triangle"></i> Failed to preview document image. Please use the download button below.</span>';
                 loaderElem.style.display = 'block';
             }
         };
-        imgElem.src = viewUrl;
+        tempImg.src = viewUrl;
+
+        // Fallback timer if network stalls
+        cvModalTimer = setTimeout(function() {
+            if (loaderElem && loaderElem.style.display !== 'none') {
+                loaderElem.innerHTML = '<span style="color: #f87171;"><i class="fa fa-clock-o"></i> Preview took too long to load. Please use the download button below.</span>';
+                loaderElem.style.display = 'block';
+            }
+        }, 8000);
     } else {
         if (loaderElem) {
             loaderElem.innerHTML = '<span style="color: #94a3b8;"><i class="fa fa-file-text-o fa-2x"></i><br><span style="display:inline-block; margin-top: 8px;">Inline preview not supported for <strong>.' + (ext || 'unknown') + '</strong> files.<br>Please use the Download button below.</span></span>';
@@ -595,6 +611,10 @@ function cvOpenDocModal(docId, docTitle, filename, fileSize, mimeType) {
 }
 
 function cvCloseDocModal() {
+    if (cvModalTimer) {
+        clearTimeout(cvModalTimer);
+        cvModalTimer = null;
+    }
     var modal = document.getElementById('cv_doc_preview_modal');
     var iframeElem = document.getElementById('cv_modal_iframe');
     var imgElem = document.getElementById('cv_modal_img');
@@ -606,8 +626,6 @@ function cvCloseDocModal() {
         iframeElem.style.display = 'none';
     }
     if (imgElem) {
-        imgElem.onload = null;
-        imgElem.onerror = null;
         imgElem.src = '';
         imgElem.style.display = 'none';
     }

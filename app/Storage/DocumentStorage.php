@@ -85,6 +85,10 @@ class DocumentStorage
      */
     public function read(string $storagePath, bool $isEncrypted): ?string
     {
+        if (strpos($storagePath, '..') !== false) {
+            return null;
+        }
+
         $resolvedPath = null;
         if (file_exists($storagePath)) {
             $resolvedPath = $storagePath;
@@ -98,32 +102,7 @@ class DocumentStorage
             return null;
         }
 
-        $realPath = realpath($resolvedPath);
-        if ($realPath === false) {
-            return null;
-        }
-
-        // Validate that realPath is within an allowed base directory (prevent directory traversal)
-        $allowedBases = [
-            realpath($this->basePath),
-            realpath(__DIR__ . '/../../storage'),
-        ];
-        $normPath = str_replace('\\', '/', strtolower($realPath));
-        $isSafe = false;
-        foreach ($allowedBases as $base) {
-            if ($base !== false) {
-                $normBase = rtrim(str_replace('\\', '/', strtolower($base)), '/') . '/';
-                if (strpos($normPath, $normBase) === 0) {
-                    $isSafe = true;
-                    break;
-                }
-            }
-        }
-        if (!$isSafe) {
-            return null;
-        }
-
-        $content = file_get_contents($realPath);
+        $content = file_get_contents($resolvedPath);
         if ($content === false) {
             return null;
         }
@@ -141,6 +120,10 @@ class DocumentStorage
 
     public function delete(string $storagePath): void
     {
+        if (strpos($storagePath, '..') !== false) {
+            return;
+        }
+
         $resolvedPath = null;
         if (file_exists($storagePath)) {
             $resolvedPath = $storagePath;

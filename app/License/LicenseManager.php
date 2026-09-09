@@ -55,8 +55,7 @@ class LicenseManager
     public static function isLicensed(?bool $forceRemote = null): bool
     {
         if ($forceRemote === null) {
-            $isAdmin = defined('ADMINAREA') && ADMINAREA;
-            $forceRemote = $isAdmin;
+            $forceRemote = false; // Fast cached check to avoid blocking subrequests and asset loads
         }
         return self::getInstance()->checkLicenseValid($forceRemote);
     }
