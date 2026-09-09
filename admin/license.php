@@ -184,57 +184,70 @@ cv_admin_header('license', 'License & Activation', 'Manage your HostNibo product
     </div>
 
     <!-- License Information Grid -->
-    <div style="padding: 24px 28px;">
-        <div class="row" style="display: flex; flex-wrap: wrap;">
-            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; height: 100%;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Registered Domain</div>
-                    <div style="font-size: 14px; font-weight: 600; color: #0f172a; word-break: break-all; display: flex; align-items: center; gap: 7px;">
-                        <i class="fa fa-globe" style="color: #3b82f6; font-size: 15px;"></i>
-                        <span><?php echo htmlspecialchars($details['domain']); ?></span>
-                    </div>
+    <style>
+    .cv-license-info-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+    }
+    @media (max-width: 991px) {
+        .cv-license-info-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 600px) {
+        .cv-license-info-grid {
+            grid-template-columns: 1fr;
+        }
+        .cv-license-info-wrap {
+            padding: 16px !important;
+        }
+    }
+    </style>
+
+    <div class="cv-license-info-wrap" style="padding: 24px 28px;">
+        <div class="cv-license-info-grid">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; min-width: 0;">
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Registered Domain</div>
+                <div style="font-size: 14px; font-weight: 600; color: #0f172a; word-break: break-all; display: flex; align-items: center; gap: 7px;">
+                    <i class="fa fa-globe" style="color: #3b82f6; font-size: 15px; flex-shrink: 0;"></i>
+                    <span style="overflow: hidden; text-overflow: ellipsis;"><?php echo htmlspecialchars($details['domain']); ?></span>
                 </div>
             </div>
 
-            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; height: 100%;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Server IP</div>
-                    <div style="font-size: 14px; font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 7px;">
-                        <i class="fa fa-server" style="color: #6366f1; font-size: 14px;"></i>
-                        <span><?php echo htmlspecialchars($details['ip']); ?></span>
-                    </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; min-width: 0;">
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Server IP</div>
+                <div style="font-size: 14px; font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 7px;">
+                    <i class="fa fa-server" style="color: #6366f1; font-size: 14px; flex-shrink: 0;"></i>
+                    <span><?php echo htmlspecialchars($details['ip']); ?></span>
                 </div>
             </div>
 
-            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; height: 100%;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Expiry Date</div>
-                    <div style="font-size: 13px; font-weight: 600; color: <?php echo $status === 'expired' ? '#dc2626' : ($details['expiry_date'] === 'Lifetime / Ongoing' ? '#16a34a' : '#0f172a'); ?>; display: flex; align-items: center; gap: 7px;">
-                        <i class="fa fa-calendar-check-o" style="color: #059669; font-size: 14px;"></i>
-                        <span><?php echo htmlspecialchars($details['expiry_date']); ?></span>
-                        <?php if ($status === 'expired'): ?>
-                            <span class="label label-danger" style="font-size: 10px; margin-left: 4px;">Expired</span>
-                        <?php endif; ?>
-                    </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; min-width: 0;">
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Expiry Date</div>
+                <div style="font-size: 13px; font-weight: 600; color: <?php echo $status === 'expired' ? '#dc2626' : ($details['expiry_date'] === 'Lifetime / Ongoing' ? '#16a34a' : '#0f172a'); ?>; display: flex; align-items: center; gap: 7px;">
+                    <i class="fa fa-calendar-check-o" style="color: #059669; font-size: 14px; flex-shrink: 0;"></i>
+                    <span><?php echo htmlspecialchars($details['expiry_date']); ?></span>
+                    <?php if ($status === 'expired'): ?>
+                        <span class="label label-danger" style="font-size: 10px; margin-left: 4px;">Expired</span>
+                    <?php endif; ?>
                 </div>
             </div>
 
-            <div class="col-md-3 col-sm-6" style="margin-bottom: 18px;">
-                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; height: 100%;">
-                    <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Server Verification</div>
-                    <div>
-                        <?php if ($isLicensed): ?>
-                            <span style="display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 700;">
-                                <i class="fa fa-check-circle" style="color: #10b981;"></i>
-                                <?php echo htmlspecialchars($details['message'] ?: 'License Valid'); ?>
-                            </span>
-                        <?php else: ?>
-                            <span style="display: inline-flex; align-items: center; gap: 6px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 700;">
-                                <i class="fa fa-exclamation-circle" style="color: #ef4444;"></i>
-                                <?php echo htmlspecialchars($details['message'] ?: 'Unlicensed Install'); ?>
-                            </span>
-                        <?php endif; ?>
-                    </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; min-width: 0;">
+                <div style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Server Verification</div>
+                <div>
+                    <?php if ($isLicensed): ?>
+                        <span style="display: inline-flex; align-items: center; gap: 6px; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+                            <i class="fa fa-check-circle" style="color: #10b981;"></i>
+                            <?php echo htmlspecialchars($details['message'] ?: 'License Valid'); ?>
+                        </span>
+                    <?php else: ?>
+                        <span style="display: inline-flex; align-items: center; gap: 6px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-weight: 700;">
+                            <i class="fa fa-exclamation-circle" style="color: #ef4444;"></i>
+                            <?php echo htmlspecialchars($details['message'] ?: 'Unlicensed Install'); ?>
+                        </span>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
